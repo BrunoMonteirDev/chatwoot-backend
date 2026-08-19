@@ -1,5 +1,5 @@
 class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::Conversations::BaseController
-  before_action :ensure_api_inbox, only: :update
+  before_action :ensure_api_inbox, only: [:update, :whatsapp_reaction, :whatsapp_transport_metadata]
 
   def index
     @messages = message_finder.perform
@@ -36,6 +36,18 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     render_could_not_create_error(e.message)
   end
 
+  def whatsapp_reaction
+    @message = @conversation.messages.find_by!(source_id: whatsapp_reaction_params[:source_id])
+    Messages::WhatsappReactionUpdateService.new(@message, whatsapp_reaction_params[:reaction].to_h).perform
+    render :update
+  end
+
+  def whatsapp_transport_metadata
+    @message = message
+    Messages::WhatsappMessageTransportUpdateService.new(@message, whatsapp_transport_metadata_params.to_h).perform
+    render :update
+  end
+
   def translate
     return head :ok if already_translated_content_available?
 
@@ -69,6 +81,14 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
   def permitted_params
     params.permit(:id, :target_language, :status, :external_error)
+  end
+
+  def whatsapp_reaction_params
+    params.permit(:source_id, reaction: [:sender_id, :emoji, :transport, :origin, :event_id])
+  end
+
+  def whatsapp_transport_metadata_params
+    params.permit(:source_id, :transport, :remote_jid, :from_me)
   end
 
   def already_translated_content_available?

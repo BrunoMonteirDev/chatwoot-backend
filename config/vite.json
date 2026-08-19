@@ -6,6 +6,7 @@
   "development": {
     "autoBuild": true,
     "publicOutputDir": "vite-dev",
+    "host": "vite",
     "port": 3036
   },
   "test": {

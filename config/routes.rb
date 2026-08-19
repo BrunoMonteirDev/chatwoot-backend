@@ -139,6 +139,12 @@ Rails.application.routes.draw do
             end
           end
           resources :campaigns, only: [:index, :create, :show, :update, :destroy]
+          namespace :whatsapp do
+            resources :messages, only: [] do
+              collection { post :status; post :reaction; post :edit; post :revoke; get :target }
+            end
+            post 'conversations/:conversation_id/history_messages', to: 'history_messages#create'
+          end
           resources :dashboard_apps, only: [:index, :show, :create, :update, :destroy]
           namespace :channels do
             resource :twilio_channel, only: [:create]
@@ -155,6 +161,12 @@ Rails.application.routes.draw do
                 member do
                   post :translate
                   post :retry
+                  post :whatsapp_transport_metadata
+                end
+                collection do
+                  # API inbox bridge operation. Reactions update an existing
+                  # WhatsApp message; they are never Chatwoot chat messages.
+                  post :whatsapp_reaction
                 end
               end
               resources :assignments, only: [:create]
