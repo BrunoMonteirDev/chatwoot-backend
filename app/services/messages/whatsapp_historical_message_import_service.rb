@@ -1,8 +1,22 @@
 class Messages::WhatsappHistoricalMessageImportService
-  TRANSPORT = 'meta_cloud'.freeze
+  TRANSPORTS = %w[meta_cloud waha].freeze
   MEDIA_TYPES = %w[image audio video document].freeze
 
   Result = Data.define(:message, :created)
+
+  # A quoted target can arrive in a later WAHA page. Resolve a second time
+  # after a batch finishes without publishing ordinary message updates.
+  def self.resolve_replies!(conversation:)
+    conversation.messages.find_each do |message|
+      external_id = message.content_attributes['in_reply_to_external_id']
+      next if external_id.blank? || message.content_attributes['in_reply_to'].present?
+
+      quoted = conversation.messages.find_by(source_id: external_id)
+      next unless quoted
+
+      message.update_columns(content_attributes: message.content_attributes.merge('in_reply_to' => quoted.id, 'in_reply_to_external_id' => quoted.source_id), updated_at: message.updated_at) # rubocop:disable Rails/SkipsModelValidations
+    end
+  end
 
   def initialize(account:, conversation:, payload:, attachment: nil)
     @account = account
@@ -38,7 +52,8 @@ class Messages::WhatsappHistoricalMessageImportService
 
   def validate!
     raise ArgumentError, 'History import requires an API inbox' unless conversation.inbox.api?
-    raise ArgumentError, 'Invalid historical Meta source ID' unless source_id.match?(/\Ameta:[^\s]+\z/)
+    raise ArgumentError, 'Invalid historical WhatsApp source ID' unless source_id.match?(source_id_pattern)
+    raise ArgumentError, 'Invalid historical transport' unless TRANSPORTS.include?(transport)
     raise ArgumentError, 'Invalid historical message direction' unless %w[incoming outgoing].include?(direction)
     raise ArgumentError, 'Invalid historical timestamp' unless timestamp
     raise ArgumentError, 'Invalid historical media type' if payload['media_type'].present? && !MEDIA_TYPES.include?(payload['media_type'])
@@ -46,6 +61,14 @@ class Messages::WhatsappHistoricalMessageImportService
 
   def source_id
     @source_id ||= payload.fetch('source_id')
+  end
+
+  def transport
+    payload.fetch('transport', source_id.start_with?('meta:') ? 'meta_cloud' : 'waha')
+  end
+
+  def source_id_pattern
+    transport == 'meta_cloud' ? /\Ameta:[^\s]+\z/ : /\Awaha:[^\s]+\z/
   end
 
   def direction
@@ -62,17 +85,20 @@ class Messages::WhatsappHistoricalMessageImportService
   def content_attributes
     attributes = {
       'whatsapp_imported_history' => true,
-      'whatsapp_transport' => TRANSPORT,
-      'meta_origin' => 'history',
-      'meta_history_thread_id' => payload.fetch('thread_id'),
+      'whatsapp_transport' => transport,
+      "#{transport == 'meta_cloud' ? 'meta' : 'waha'}_origin" => 'history',
+      "#{transport == 'meta_cloud' ? 'meta' : 'waha'}_history_thread_id" => payload.fetch('thread_id'),
       'whatsapp_from_me' => direction == 'outgoing'
     }
     attributes['whatsapp_remote_jid'] = payload['remote_jid'] if payload['remote_jid'].present?
-    attributes['meta_history_status'] = payload['history_status'] if payload['history_status'].present?
+    attributes["#{transport == 'meta_cloud' ? 'meta' : 'waha'}_history_status"] = payload['history_status'] if payload['history_status'].present?
+    attributes['whatsapp_chat_type'] = 'group' if payload['chat_type'] == 'group'
+    attributes['whatsapp_participant_jid'] = payload['participant_jid'] if payload['participant_jid'].present?
+    attributes['whatsapp_participant_name'] = payload['participant_name'] if payload['participant_name'].present?
     attributes['historical_media_unavailable'] = true if ActiveModel::Type::Boolean.new.cast(payload['historical_media_unavailable'])
     if payload['quoted_message_id'].present?
-      attributes['in_reply_to_external_id'] = "meta:#{payload['quoted_message_id']}"
-      attributes['meta_quoted_message_id'] = payload['quoted_message_id']
+      attributes['in_reply_to_external_id'] = "#{transport == 'meta_cloud' ? 'meta' : 'waha'}:#{payload['quoted_message_id']}"
+      attributes["#{transport == 'meta_cloud' ? 'meta' : 'waha'}_quoted_message_id"] = payload['quoted_message_id']
     end
     attributes
   end
@@ -91,7 +117,7 @@ class Messages::WhatsappHistoricalMessageImportService
       sender_type: direction == 'incoming' ? 'Contact' : nil,
       sender_id: direction == 'incoming' ? conversation.contact_id : nil,
       source_id: source_id,
-      external_source_ids: { 'meta' => source_id.delete_prefix('meta:') },
+      external_source_ids: { transport == 'meta_cloud' ? 'meta' : 'waha' => source_id.delete_prefix(transport == 'meta_cloud' ? 'meta:' : 'waha:') },
       content_attributes: content_attributes,
       additional_attributes: { 'whatsapp_imported_history' => true },
       created_at: timestamp,

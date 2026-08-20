@@ -47,4 +47,18 @@ describe Messages::WhatsappHistoricalMessageImportService do
 
     expect(result.message.reload.content_attributes).to include('in_reply_to' => quoted.id, 'in_reply_to_external_id' => quoted.source_id)
   end
+
+  it 'imports a WAHA record silently using its own namespace and group author' do
+    result = described_class.new(account: account, conversation: conversation, payload: {
+      source_id: 'waha:3EB0HISTORY', transport: 'waha', direction: 'outgoing', timestamp: timestamp,
+      content: 'Resposta histórica', thread_id: '120363@g.us', remote_jid: '120363@g.us',
+      quoted_message_id: '3EB0QUOTED', chat_type: 'group', participant_jid: '5511999999999@c.us', participant_name: 'Ana'
+    }).perform
+
+    expect(result.message).to have_attributes(source_id: 'waha:3EB0HISTORY', message_type: 'outgoing', created_at: Time.zone.at(timestamp))
+    expect(result.message.content_attributes).to include(
+      'whatsapp_transport' => 'waha', 'waha_origin' => 'history', 'whatsapp_chat_type' => 'group',
+      'whatsapp_participant_jid' => '5511999999999@c.us', 'in_reply_to_external_id' => 'waha:3EB0QUOTED'
+    )
+  end
 end

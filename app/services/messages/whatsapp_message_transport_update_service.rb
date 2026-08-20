@@ -1,5 +1,8 @@
 class Messages::WhatsappMessageTransportUpdateService
-  TRANSPORTS = %w[evolution meta_cloud].freeze
+  # Keep the persisted message namespace aligned with the bridge transports.
+  # WAHA messages use `waha:<provider-message-id>` just like the legacy
+  # Evolution and official Meta transports use their own namespaces.
+  TRANSPORTS = %w[evolution waha meta_cloud].freeze
 
   def initialize(message, metadata)
     @message = message
@@ -24,7 +27,7 @@ class Messages::WhatsappMessageTransportUpdateService
   attr_reader :message, :metadata
 
   def valid?
-    metadata['source_id'].is_a?(String) && metadata['source_id'].match?(/\A(?:evolution|meta):.+\z/) &&
+    metadata['source_id'].is_a?(String) && metadata['source_id'].match?(/\A(?:evolution|waha|meta):.+\z/) &&
       TRANSPORTS.include?(metadata['transport']) && metadata['remote_jid'].is_a?(String) && metadata['remote_jid'].present?
   end
 end

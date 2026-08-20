@@ -14,6 +14,11 @@ class Api::V1::Accounts::Whatsapp::HistoryMessagesController < Api::V1::Accounts
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  def resolve_replies
+    Messages::WhatsappHistoricalMessageImportService.resolve_replies!(conversation: @conversation)
+    head :no_content
+  end
+
   private
 
   def fetch_conversation
@@ -28,9 +33,9 @@ class Api::V1::Accounts::Whatsapp::HistoryMessagesController < Api::V1::Accounts
 
   def history_params
     params.permit(
-      :source_id, :direction, :timestamp, :content, :thread_id, :remote_jid,
+      :source_id, :transport, :direction, :timestamp, :content, :thread_id, :remote_jid,
       :quoted_message_id, :history_status, :status, :media_type,
-      :historical_media_unavailable
+      :historical_media_unavailable, :chat_type, :participant_jid, :participant_name
     )
   end
 end

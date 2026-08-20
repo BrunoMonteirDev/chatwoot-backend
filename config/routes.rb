@@ -144,6 +144,7 @@ Rails.application.routes.draw do
               collection { post :status; post :reaction; post :edit; post :revoke; get :target }
             end
             post 'conversations/:conversation_id/history_messages', to: 'history_messages#create'
+            post 'conversations/:conversation_id/history_messages/resolve_replies', to: 'history_messages#resolve_replies'
           end
           resources :dashboard_apps, only: [:index, :show, :create, :update, :destroy]
           namespace :channels do
