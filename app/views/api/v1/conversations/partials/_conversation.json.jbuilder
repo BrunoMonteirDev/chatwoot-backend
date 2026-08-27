@@ -27,6 +27,10 @@ json.meta do
 end
 
 json.id conversation.display_id
+# Public Chatwoot APIs use display_id as `id`. Bridge-only historical
+# operations must address the database record instead, without changing the
+# established frontend contract above.
+json.internal_id conversation.id
 if conversation.messages.where(account_id: conversation.account_id).last.blank?
   json.messages []
 else

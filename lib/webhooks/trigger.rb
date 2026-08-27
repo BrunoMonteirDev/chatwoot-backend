@@ -40,15 +40,28 @@ class Webhooks::Trigger
 
   def perform_request
     body = @payload.to_json
-    SafeFetch.fetch(
-      @url,
+    options = {
       method: :post,
       body: body,
       headers: request_headers(body),
       open_timeout: webhook_timeout,
       read_timeout: webhook_timeout,
       validate_content_type: false
-    ) { |_response| nil }
+    }
+
+    # API inboxes in this Docker deployment deliver to the bridge over the
+    # private Compose network. Keep SafeFetch's SSRF protection for every
+    # other webhook; only this exact, configured internal callback is allowed
+    # to resolve a private service hostname.
+    if internal_bridge_webhook?
+      SafeFetch::PrivateNetworkRequest.new(SafeFetch::RequestOptions.new(url: @url, **options)).perform { |_response| nil }
+    else
+      SafeFetch.fetch(@url, **options) { |_response| nil }
+    end
+  end
+
+  def internal_bridge_webhook?
+    @url == ENV.fetch('INTERNAL_BRIDGE_WEBHOOK_URL', 'http://bridge:3100/webhooks/chatwoot')
   end
 
   def request_headers(body)

@@ -35,7 +35,13 @@ class Api::V1::Accounts::Whatsapp::MessagesController < Api::V1::Accounts::BaseC
   # It intentionally returns no message body or attachment data.
   def target
     message = Current.account.messages.find_by!(source_id: params.require(:source_id))
-    render json: { id: message.id, conversation_id: message.conversation_id, source_id: message.source_id, content_attributes: message.content_attributes }
+    render json: {
+      id: message.id,
+      conversation_id: message.conversation_id,
+      source_id: message.source_id,
+      content_attributes: message.content_attributes,
+      attachments_count: message.attachments.count
+    }
   end
 
   private

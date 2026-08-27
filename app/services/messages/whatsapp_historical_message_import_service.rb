@@ -35,7 +35,10 @@ class Messages::WhatsappHistoricalMessageImportService
     Message.transaction do
       lock_source_id!
       existing = account.messages.find_by(source_id: source_id)
-      return Result.new(message: existing, created: false) if existing
+      if existing
+        enrich_existing_media!(existing)
+        return Result.new(message: existing, created: false)
+      end
 
       result = Message.insert_all!([message_attributes], returning: %w[id])
       message = Message.find(result.rows.first.first)
@@ -110,8 +113,8 @@ class Messages::WhatsappHistoricalMessageImportService
       conversation_id: conversation.id,
       message_type: Message.message_types.fetch(direction),
       content_type: Message.content_types.fetch('text'),
-      content: payload['content'].to_s,
-      processed_message_content: payload['content'].to_s.truncate(150_000),
+      content: historical_content,
+      processed_message_content: historical_content.truncate(150_000),
       private: false,
       status: Message.statuses.fetch(normalized_status),
       sender_type: direction == 'incoming' ? 'Contact' : nil,
@@ -137,6 +140,30 @@ class Messages::WhatsappHistoricalMessageImportService
                 else 'file'
                 end
     Attachment.create!(account: account, message: message, file_type: file_type, file: attachment)
+  end
+
+  # A WAHA history retry may finally be able to fetch a media file that was
+  # unavailable on the initial import. Preserve the original message/source
+  # identity and attach the recovered file instead of creating a duplicate.
+  def enrich_existing_media!(message)
+    if attachment.present? && !message.attachments.exists?
+      attach_media!(message)
+      attributes = message.content_attributes.except('historical_media_unavailable')
+      message.update_columns(content_attributes: attributes, updated_at: message.updated_at) # rubocop:disable Rails/SkipsModelValidations
+    elsif media_unavailable? && message.attachments.none? && message.content.blank?
+      message.update_columns(content: historical_content, processed_message_content: historical_content.truncate(150_000), updated_at: message.updated_at) # rubocop:disable Rails/SkipsModelValidations
+    end
+  end
+
+  def media_unavailable?
+    ActiveModel::Type::Boolean.new.cast(payload['historical_media_unavailable'])
+  end
+
+  def historical_content
+    content = payload['content'].to_s
+    return content if content.present? || !media_unavailable?
+
+    'Mídia indisponível no histórico.'
   end
 
   def resolve_reply!(message)

@@ -2,7 +2,7 @@
 # It initializes with necessary attributes and provides a perform method
 # to create a user and account user in a transaction.
 class AgentBuilder
-  LIMIT_EXCEEDED_MESSAGE = 'Account limit exceeded. Please purchase more licenses'.freeze
+  LIMIT_EXCEEDED_MESSAGE = 'Limite de agentes desta conta atingido. Fale com o suporte para ampliar o limite.'.freeze
 
   class LimitExceededError < StandardError
     def initialize

@@ -40,6 +40,34 @@ describe Messages::WhatsappHistoricalMessageImportService do
     expect(conversation.messages.where(source_id: payload[:source_id]).count).to eq(1)
   end
 
+  it 'attaches recovered historical media to an already imported message without duplicating it' do
+    existing = create(:message, account: account, conversation: conversation, inbox: inbox,
+                                source_id: 'waha:3EB0MEDIA', content: nil,
+                                content_attributes: { 'historical_media_unavailable' => true })
+    attachment = fixture_file_upload(Rails.root.join('spec/assets/avatar.png'), 'image/png')
+
+    result = described_class.new(account: account, conversation: conversation, payload: {
+      source_id: 'waha:3EB0MEDIA', transport: 'waha', direction: 'incoming', timestamp: timestamp,
+      content: '', thread_id: '5511999999999', remote_jid: '5511999999999@c.us', media_type: 'image'
+    }, attachment: attachment).perform
+
+    expect(result).to have_attributes(created: false, message: existing)
+    expect(existing.reload.attachments.count).to eq(1)
+    expect(existing.content_attributes).not_to have_key('historical_media_unavailable')
+    expect(conversation.messages.where(source_id: 'waha:3EB0MEDIA').count).to eq(1)
+  end
+
+  it 'keeps a readable placeholder when historical media is permanently unavailable' do
+    result = described_class.new(account: account, conversation: conversation, payload: {
+      source_id: 'waha:3EB0UNAVAILABLE', transport: 'waha', direction: 'incoming', timestamp: timestamp,
+      content: '', thread_id: '5511999999999', remote_jid: '5511999999999@c.us', media_type: 'audio',
+      historical_media_unavailable: true
+    }).perform
+
+    expect(result.message.content).to eq('Mídia indisponível no histórico.')
+    expect(result.message.content_attributes).to include('historical_media_unavailable' => true)
+  end
+
   it 'resolves a historical reply when its target already exists' do
     quoted = create(:message, account: account, conversation: conversation, inbox: inbox, source_id: 'meta:wamid-quoted')
 
