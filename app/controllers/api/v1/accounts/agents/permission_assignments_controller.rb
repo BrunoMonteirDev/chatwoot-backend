@@ -11,7 +11,9 @@ class Api::V1::Accounts::Agents::PermissionAssignmentsController < Api::V1::Acco
     assignments = assignment_params[:inbox_assignments] || []
     profile_ids = assignments.map { |item| item[:permission_profile_id].to_i }
     profiles = Current.account.permission_profiles.where(id: profile_ids + [assignment_params[:permission_profile_id].to_i]).index_by(&:id)
-    return render json: { error: 'Perfil de permissão inválido para esta conta.' }, status: :unprocessable_entity if (profile_ids + [assignment_params[:permission_profile_id].to_i]).any? { |id| id.positive? && !profiles.key?(id) }
+    requested_ids = profile_ids + [assignment_params[:permission_profile_id].to_i]
+    invalid_profile = requested_ids.any? { |id| id.positive? && !profiles.key?(id) } || assignments.any? { |item| item[:permission_profile_id].present? && profiles[item[:permission_profile_id].to_i]&.kind != 'inbox' } || (assignment_params[:permission_profile_id].present? && profiles[assignment_params[:permission_profile_id].to_i]&.kind != 'system')
+    return render json: { error: 'O perfil deve pertencer a esta conta e ao tipo correto.' }, status: :unprocessable_entity if invalid_profile
 
     ActiveRecord::Base.transaction do
       Current.account.account_users.find_by!(user_id: @agent.id).update!(permission_profile_id: assignment_params[:permission_profile_id].presence)

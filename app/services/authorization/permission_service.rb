@@ -33,7 +33,7 @@ module Authorization
 
       memberships = InboxMember.where(user_id: @user.id, inbox_id: @account.inboxes.select(:id)).includes(:permission_profile, :inbox)
       ids = memberships.each_with_object([]) do |member, result|
-        profile = member.permission_profile || PermissionProfile.default_for(@account)
+        profile = member.permission_profile || PermissionProfile.default_inbox_for(@account)
         scope = conversations.where(inbox_id: member.inbox_id)
         if profile.inbox_permissions.include?('conversation_view_all')
           result.concat(scope.pluck(:id))
@@ -51,11 +51,11 @@ module Authorization
     private
 
     def account_profile
-      @account_user&.permission_profile || PermissionProfile.default_for(@account)
+      @account_user&.permission_profile || PermissionProfile.default_system_for(@account)
     end
 
     def inbox_profile(inbox)
-      InboxMember.find_by(inbox_id: inbox.id, user_id: @user.id)&.permission_profile || PermissionProfile.default_for(@account)
+      InboxMember.find_by(inbox_id: inbox.id, user_id: @user.id)&.permission_profile || PermissionProfile.default_inbox_for(@account)
     end
   end
 end

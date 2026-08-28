@@ -3,7 +3,8 @@ class Api::V1::Accounts::PermissionProfilesController < Api::V1::Accounts::BaseC
 
   def index
     authorize PermissionProfile
-    PermissionProfile.default_for(Current.account)
+    PermissionProfile.default_inbox_for(Current.account)
+    PermissionProfile.default_system_for(Current.account)
     @permission_profiles = Current.account.permission_profiles.order(:name)
   end
 
@@ -34,5 +35,5 @@ class Api::V1::Accounts::PermissionProfilesController < Api::V1::Accounts::BaseC
   private
 
   def profile = @permission_profile = Current.account.permission_profiles.find(params[:id])
-  def profile_params = params.require(:permission_profile).permit(:name, :description, inbox_permissions: [], system_permissions: [])
+  def profile_params = params.require(:permission_profile).permit(:name, :description, :kind, inbox_permissions: [], system_permissions: [])
 end
