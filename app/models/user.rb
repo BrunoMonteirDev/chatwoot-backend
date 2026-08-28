@@ -151,6 +151,7 @@ class User < ApplicationRecord
       id: id,
       name: name,
       available_name: available_name,
+      email: email,
       avatar_url: avatar_url,
       type: 'user',
       availability_status: availability_status,
