@@ -12,7 +12,10 @@ module Bridge
 
     def self.ensure!
       user = User.find_or_create_by!(email: EMAIL) do |record|
-        password = SecureRandom.base58(48)
+        # Chatwoot's password policy requires at least one special character.
+        # This password is never used interactively; it only satisfies the
+        # User model while the bridge authenticates with its access token.
+        password = "#{SecureRandom.base58(48)}!"
         record.name = NAME
         record.password = password
         record.password_confirmation = password
