@@ -122,6 +122,9 @@ class User < ApplicationRecord
   after_save :sync_user_sessions, if: :saved_change_to_tokens?
 
   scope :order_by_full_name, -> { order('lower(name) ASC') }
+  # Infrastructure identities must never appear as human agents, consume a
+  # tenant seat, or become candidates for conversation assignment.
+  scope :without_system_accounts, -> { where("custom_attributes ->> 'system_account' IS DISTINCT FROM ?", 'whatsapp_bridge') }
 
   before_validation do
     self.email = email.try(:downcase)

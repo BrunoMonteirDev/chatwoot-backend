@@ -72,7 +72,7 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
   end
 
   def agents
-    @agents ||= Current.account.users.order_by_full_name.includes(:account_users, { avatar_attachment: [:blob] })
+    @agents ||= Current.account.users.without_system_accounts.order_by_full_name.includes(:account_users, { avatar_attachment: [:blob] })
   end
 
   def bulk_create_agents(emails)
@@ -109,7 +109,7 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
   end
 
   def available_agent_count
-    Current.account.usage_limits[:agents] - Current.account.account_users.count
+    Current.account.usage_limits[:agents] - Current.account.account_users.joins(:user).merge(User.without_system_accounts).count
   end
 
   def delete_user_record(agent)

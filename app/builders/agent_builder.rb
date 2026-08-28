@@ -38,7 +38,7 @@ class AgentBuilder
   private
 
   def can_add_agent?
-    account.usage_limits[:agents] > account.account_users.count
+    account.usage_limits[:agents] > account.account_users.joins(:user).merge(User.without_system_accounts).count
   end
 
   # Finds a user by email or creates a new one with a temporary password.
