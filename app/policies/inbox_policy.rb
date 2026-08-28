@@ -43,27 +43,27 @@ class InboxPolicy < ApplicationPolicy
   end
 
   def create?
-    @account_user.administrator?
+    @account_user.administrator? || Authorization::PermissionService.new(account: account, user: user).system_allowed?('inboxes_manage')
   end
 
   def update?
-    @account_user.administrator?
+    @account_user.administrator? || Authorization::PermissionService.new(account: account, user: user).inbox_allowed?(record, 'inbox_manage')
   end
 
   def destroy?
-    @account_user.administrator?
+    @account_user.administrator? || Authorization::PermissionService.new(account: account, user: user).inbox_allowed?(record, 'inbox_manage')
   end
 
   def set_agent_bot?
-    @account_user.administrator?
+    update?
   end
 
   def avatar?
-    @account_user.administrator?
+    update?
   end
 
   def sync_templates?
-    @account_user.administrator?
+    update?
   end
 
   def whatsapp_business_management_token?
@@ -75,7 +75,7 @@ class InboxPolicy < ApplicationPolicy
   end
 
   def reset_secret?
-    @account_user.administrator?
+    update?
   end
 
   def enable_whatsapp_calling?

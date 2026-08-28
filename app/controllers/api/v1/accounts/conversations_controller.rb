@@ -1,4 +1,5 @@
 class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseController
+  include PermissionAuthorization
   include Events::Types
   include DateRangeHelper
   include HmacConcern
@@ -45,6 +46,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def update
+    require_inbox_permission!(@conversation.inbox, 'conversation_status_priority') and return
     @conversation.update!(permitted_update_params)
   end
 
@@ -80,6 +82,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def toggle_status
+    require_inbox_permission!(@conversation.inbox, 'conversation_status_priority') and return
     # FIXME: move this logic into a service object
     if bot_handoff?
       @conversation.bot_handoff!
@@ -99,6 +102,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def toggle_priority
+    require_inbox_permission!(@conversation.inbox, 'conversation_status_priority') and return
     @conversation.toggle_priority(params[:priority])
     head :ok
   end

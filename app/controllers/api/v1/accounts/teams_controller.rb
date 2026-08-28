@@ -1,4 +1,6 @@
 class Api::V1::Accounts::TeamsController < Api::V1::Accounts::BaseController
+  include PermissionAuthorization
+  before_action -> { require_system_permission!('teams_manage') }
   before_action :fetch_team, only: [:show, :update, :destroy]
   before_action :check_authorization
 

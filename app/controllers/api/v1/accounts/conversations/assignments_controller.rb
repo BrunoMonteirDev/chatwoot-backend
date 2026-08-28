@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Conversations::AssignmentsController < Api::V1::Accounts::Conversations::BaseController
+  include PermissionAuthorization
+  before_action :authorize_assignment
   # assigns agent/team to a conversation
   def create
     if params.key?(:assignee_id) || agent_bot_assignment?
@@ -11,6 +13,11 @@ class Api::V1::Accounts::Conversations::AssignmentsController < Api::V1::Account
   end
 
   private
+
+  def authorize_assignment
+    permission = params[:assignee_id].to_i == Current.user.id ? 'conversation_take' : 'conversation_assign'
+    require_inbox_permission!(@conversation.inbox, permission)
+  end
 
   def set_agent
     resource = Conversations::AssignmentService.new(

@@ -1,4 +1,6 @@
 class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController
+  include PermissionAuthorization
+  before_action -> { require_system_permission!('inboxes_manage') }, only: [:create]
   include Api::V1::InboxesHelper
   before_action :fetch_inbox, except: [:index, :create]
   before_action :fetch_agent_bot, only: [:set_agent_bot]

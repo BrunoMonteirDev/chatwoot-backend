@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::Conversations::BaseController
+  include PermissionAuthorization
+  before_action -> { require_inbox_permission!(@conversation.inbox, 'conversation_reply') }, only: [:create, :update, :destroy, :retry, :whatsapp_reaction]
   before_action :ensure_api_inbox, only: [:update, :whatsapp_reaction, :whatsapp_transport_metadata]
 
   def index

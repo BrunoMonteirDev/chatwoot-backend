@@ -21,6 +21,7 @@ class InboxMember < ApplicationRecord
 
   belongs_to :user
   belongs_to :inbox
+  belongs_to :permission_profile, optional: true
 
   after_create :add_agent_to_round_robin
   after_destroy :remove_agent_from_round_robin

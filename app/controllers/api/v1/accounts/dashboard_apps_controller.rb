@@ -1,4 +1,6 @@
 class Api::V1::Accounts::DashboardAppsController < Api::V1::Accounts::BaseController
+  include PermissionAuthorization
+  before_action -> { require_system_permission!('integrations_manage') }
   before_action :check_authorization
   before_action :fetch_dashboard_apps, except: [:create]
   before_action :fetch_dashboard_app, only: [:show, :update, :destroy]

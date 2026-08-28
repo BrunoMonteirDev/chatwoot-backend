@@ -1,4 +1,6 @@
 class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
+  include PermissionAuthorization
+  before_action -> { require_system_permission!('agents_manage') }
   before_action :fetch_agent, except: [:create, :index, :bulk_create]
   before_action :check_authorization
 

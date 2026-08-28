@@ -1,4 +1,6 @@
 class Api::V1::Accounts::LabelsController < Api::V1::Accounts::BaseController
+  include PermissionAuthorization
+  before_action -> { require_system_permission!('labels_manage') }
   before_action :fetch_label, except: [:index, :create]
   before_action :check_authorization
 

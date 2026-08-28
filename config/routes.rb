@@ -63,6 +63,7 @@ Rails.application.routes.draw do
           end
           resources :agents, only: [:index, :create, :update, :destroy] do
             post :bulk_create, on: :collection
+            resource :permission_assignment, only: [:show, :update], module: :agents
           end
           namespace :captain do
             resource :preferences, only: [:show, :update]
@@ -135,6 +136,7 @@ Rails.application.routes.draw do
           end
           resources :sla_policies, only: [:index, :create, :show, :update, :destroy]
           resources :custom_roles, only: [:index, :create, :show, :update, :destroy]
+          resources :permission_profiles, only: [:index, :create, :show, :update, :destroy]
           resources :agent_capacity_policies, only: [:index, :create, :show, :update, :destroy] do
             scope module: :agent_capacity_policies do
               resources :users, only: [:index, :create, :destroy]

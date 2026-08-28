@@ -1,4 +1,6 @@
 class Api::V1::Accounts::CannedResponsesController < Api::V1::Accounts::BaseController
+  include PermissionAuthorization
+  before_action -> { require_system_permission!('canned_responses_manage') }
   before_action :fetch_canned_response, only: [:update, :destroy]
 
   def index

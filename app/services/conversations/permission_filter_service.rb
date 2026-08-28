@@ -11,7 +11,7 @@ class Conversations::PermissionFilterService
   def perform
     return conversations if user_role == 'administrator'
 
-    accessible_conversations
+    Authorization::PermissionService.new(account: account, user: user).visible_conversations(conversations)
   end
 
   private

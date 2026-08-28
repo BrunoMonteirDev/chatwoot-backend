@@ -8,7 +8,7 @@ class ConversationPolicy < ApplicationPolicy
   end
 
   def show?
-    administrator? || agent_bot? || agent_can_view_conversation?
+    administrator? || agent_bot? || Authorization::PermissionService.new(account: account, user: user).can_view_conversation?(record)
   end
 
   private
