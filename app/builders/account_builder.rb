@@ -13,6 +13,10 @@ class AccountBuilder
       @account = create_account
       @user = create_and_link_user
     end
+    # The bridge service account is internal infrastructure. Linking it here
+    # makes every new tenant operational without an administrator copying an
+    # API token or restarting any Docker service.
+    Bridge::ServiceAccount.grant_access!(@account)
     [@user, @account]
   rescue StandardError => e
     Rails.logger.debug e.inspect
