@@ -5,9 +5,9 @@ DeviseTokenAuth.setup do |config|
   # each request.
   config.change_headers_on_each_request = false
 
-  # By default, users will need to re-authenticate after 2 weeks. This setting
-  # determines how long tokens will remain valid after they are issued.
-  config.token_lifespan = 2.months
+  # Keep browser and installed-PWA sessions for one year. Sessions are still
+  # revoked by logout, password reset, or the device limit below.
+  config.token_lifespan = 1.year
 
   # By default, old tokens are not invalidated when password is changed.
   # Enable this option if you want to make passwords updates to logout other devices.
