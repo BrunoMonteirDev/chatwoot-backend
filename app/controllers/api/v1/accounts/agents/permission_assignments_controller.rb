@@ -23,6 +23,7 @@ class Api::V1::Accounts::Agents::PermissionAssignmentsController < Api::V1::Acco
       end
     end
     show
+    render :show
   end
 
   private

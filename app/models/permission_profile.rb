@@ -14,6 +14,7 @@ class PermissionProfile < ApplicationRecord
   validate :permissions_match_kind
   validate :only_one_default_per_account
   before_destroy :prevent_default_deletion
+  after_update_commit :invalidate_access, if: :saved_change_to_inbox_permissions? || :saved_change_to_system_permissions?
 
   def self.default_inbox_for(account)
     account.permission_profiles.find_or_create_by!(kind: :inbox, default: true) do |profile|
@@ -48,5 +49,12 @@ class PermissionProfile < ApplicationRecord
   def permissions_match_kind
     errors.add(:system_permissions, 'devem estar vazias em um perfil de inbox') if kind_inbox? && system_permissions.present?
     errors.add(:inbox_permissions, 'devem estar vazias em um perfil geral') if kind_system? && inbox_permissions.present?
+  end
+
+  def invalidate_access
+    user_ids = kind_inbox? ? inbox_members.pluck(:user_id) : account_users.pluck(:user_id)
+    invalidator = ::Conversations::UnreadCounts::FilteredCountInvalidator.new(account)
+    invalidator.users_visibility_changed!(user_ids: user_ids) if kind_inbox?
+    Rails.configuration.dispatcher.dispatch(ACCOUNT_CACHE_INVALIDATED, Time.zone.now, account: account, cache_keys: account.cache_keys)
   end
 end

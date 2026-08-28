@@ -55,6 +55,9 @@ class AutomationRules::ConditionsFilterService < FilterService
     if query_hash[:filter_operator] == 'starts_with'
       @filter_values["value_#{current_index}"] = "#{string_filter_values(query_hash)}%"
       like_filter_string(query_hash[:filter_operator], current_index)
+    elsif query_hash[:filter_operator] == 'ends_with'
+      @filter_values["value_#{current_index}"] = "%#{string_filter_values(query_hash)}"
+      like_filter_string(query_hash[:filter_operator], current_index)
     else
       super
     end

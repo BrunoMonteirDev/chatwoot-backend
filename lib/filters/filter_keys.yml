@@ -100,6 +100,8 @@ conversations:
       - "not_equal_to"
       - "contains"
       - "does_not_contain"
+      - "starts_with"
+      - "ends_with"
   created_at:
     attribute_type: "standard"
     data_type: "date"
@@ -136,6 +138,8 @@ contacts:
       - "not_equal_to"
       - "contains"
       - "does_not_contain"
+      - "starts_with"
+      - "ends_with"
   phone_number:
     attribute_type: "standard"
     data_type: "text" # Text is not explicity defined in filters, default filter will be used
@@ -145,6 +149,7 @@ contacts:
       - "contains"
       - "does_not_contain"
       - "starts_with"
+      - "ends_with"
   email:
     attribute_type: "standard"
     data_type: "text_case_insensitive"

@@ -60,6 +60,12 @@ class AccountUser < ApplicationRecord
     administrator? ? ['administrator'] : ['agent']
   end
 
+  def effective_system_permissions
+    return ['administrator'] if administrator?
+
+    (permission_profile || PermissionProfile.default_system_for(account)).system_permissions
+  end
+
   def push_event_data
     {
       id: id,
@@ -84,7 +90,7 @@ class AccountUser < ApplicationRecord
   end
 
   def filtered_unread_count_visibility_changed?
-    previous_changes.key?('role') || previous_changes.key?('custom_role_id')
+    previous_changes.key?('role') || previous_changes.key?('custom_role_id') || previous_changes.key?('permission_profile_id')
   end
 
   def invalidate_filtered_unread_count_visibility

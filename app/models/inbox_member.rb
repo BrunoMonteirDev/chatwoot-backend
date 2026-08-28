@@ -25,7 +25,8 @@ class InboxMember < ApplicationRecord
 
   after_create :add_agent_to_round_robin
   after_destroy :remove_agent_from_round_robin
-  after_commit :invalidate_filtered_unread_count_visibility, on: [:create, :destroy]
+  after_commit :invalidate_filtered_unread_count_visibility, on: [:create, :update, :destroy]
+  after_commit :dispatch_account_cache_invalidated, on: [:create, :update, :destroy]
 
   private
 
@@ -39,6 +40,13 @@ class InboxMember < ApplicationRecord
 
   def invalidate_filtered_unread_count_visibility
     ::Conversations::UnreadCounts::FilteredCountInvalidator.new(inbox&.account).user_visibility_changed!(user_id: user_id)
+  end
+
+  def dispatch_account_cache_invalidated
+    account = inbox&.account
+    return unless account
+
+    Rails.configuration.dispatcher.dispatch(ACCOUNT_CACHE_INVALIDATED, Time.zone.now, account: account, cache_keys: account.cache_keys)
   end
 end
 

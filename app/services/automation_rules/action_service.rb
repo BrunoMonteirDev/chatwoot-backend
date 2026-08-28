@@ -36,8 +36,30 @@ class AutomationRules::ActionService < ActionService
   end
 
   def send_webhook_event(webhook_url)
-    payload = @conversation.webhook_data.merge(event: "automation_event.#{@rule.event_name}")
-    WebhookJob.perform_later(webhook_url[0], payload)
+    config = Array(webhook_url).first
+    config = JSON.parse(config) if config.is_a?(String) && config.strip.start_with?('{')
+    if config.is_a?(Hash)
+      AutomationRules::WebhookActionJob.perform_later(config, @conversation.webhook_data.merge(event: "automation_event.#{@rule.event_name}"))
+    else
+      WebhookJob.perform_later(config, @conversation.webhook_data.merge(event: "automation_event.#{@rule.event_name}"))
+    end
+  end
+
+  def update_conversation_attributes(params)
+    attributes = Array(params).first
+    attributes = JSON.parse(attributes) if attributes.is_a?(String)
+    return unless attributes.is_a?(Hash)
+
+    @conversation.update!(custom_attributes: @conversation.custom_attributes.merge(attributes.stringify_keys))
+  end
+
+  def update_contact_attributes(params)
+    attributes = Array(params).first
+    attributes = JSON.parse(attributes) if attributes.is_a?(String)
+    return unless attributes.is_a?(Hash)
+
+    contact = @conversation.contact
+    contact.update!(custom_attributes: contact.custom_attributes.merge(attributes.stringify_keys))
   end
 
   def send_message(message)

@@ -1,25 +1,34 @@
 class AutomationRulePolicy < ApplicationPolicy
   def index?
-    @account_user.administrator?
+    can_manage_automations?
   end
 
   def create?
-    @account_user.administrator?
+    can_manage_automations?
   end
 
   def show?
-    @account_user.administrator?
+    can_manage_automations?
   end
 
   def update?
-    @account_user.administrator?
+    can_manage_automations?
   end
 
   def clone?
-    @account_user.administrator?
+    can_manage_automations?
   end
 
   def destroy?
-    @account_user.administrator?
+    can_manage_automations?
+  end
+
+  private
+
+  def can_manage_automations?
+    return true if @account_user&.administrator?
+
+    (@account_user&.permission_profile || PermissionProfile.default_system_for(@account))
+      .system_permissions.include?('account_settings_manage')
   end
 end
