@@ -60,6 +60,22 @@ RSpec.describe Contact do
   end
 
   context 'when phone number format' do
+    it 'normalizes a Brazilian mobile number with the additional ninth digit' do
+      contact = create(:contact, phone_number: '+5544984532595')
+
+      expect(contact.phone_number).to eq('+554484532595')
+    end
+
+    it 'does not allow a legacy Brazilian number with the additional ninth digit to be duplicated' do
+      account = create(:account)
+      contact = create(:contact, account: account, phone_number: '+554484532595')
+      contact.update_column(:phone_number, '+5544984532595')
+
+      duplicate = build(:contact, account: account, phone_number: '+554484532595')
+      expect(duplicate).not_to be_valid
+      expect(duplicate.errors.of_kind?(:phone_number, :taken)).to be(true)
+    end
+
     it 'will throw error for existing invalid phone number' do
       contact = create(:contact)
       expect { contact.update!(phone_number: '123456789') }.to raise_error(ActiveRecord::RecordInvalid)

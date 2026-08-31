@@ -174,6 +174,31 @@ describe ActionCableListener do
     end
   end
 
+  describe '#inbox_updated' do
+    let(:event) { Events::Base.new(:'inbox.updated', Time.zone.now, inbox: inbox, changed_attributes: {}) }
+
+    it 'broadcasts the API-shaped inbox data to the account stream' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        ["account_#{account.id}"],
+        'inbox.updated',
+        hash_including(id: inbox.id, name: inbox.name, channel_type: inbox.channel_type, account_id: account.id)
+      )
+      listener.inbox_updated(event)
+    end
+  end
+
+  describe '#conversation_deleted' do
+    let(:conversation_data) { { id: conversation.id, account_id: account.id, inbox_id: inbox.id } }
+    let(:event) { Events::Base.new(:'conversation.deleted', Time.zone.now, conversation_data: conversation_data) }
+
+    it 'broadcasts only the deleted conversation identity to the account stream' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        ["account_#{account.id}"], 'conversation.deleted', conversation_data
+      )
+      listener.conversation_deleted(event)
+    end
+  end
+
   describe '#notification_deleted' do
     let(:event_name) { :'notification.deleted' }
     let!(:notification) { create(:notification, account: account, user: agent) }

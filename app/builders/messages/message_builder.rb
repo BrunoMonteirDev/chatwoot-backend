@@ -14,6 +14,7 @@ class Messages::MessageBuilder
     @message_type = params[:message_type] || 'outgoing'
     @attachments = params[:attachments]
     @is_voice_message = ActiveModel::Type::Boolean.new.cast(params[:is_voice_message])
+    @idempotent = ActiveModel::Type::Boolean.new.cast(params[:idempotent])
     @automation_rule = content_attributes&.dig(:automation_rule_id)
     return unless params.instance_of?(ActionController::Parameters)
 
@@ -22,6 +23,49 @@ class Messages::MessageBuilder
   end
 
   def perform
+    return perform_idempotently if idempotent?
+
+    create_message
+  end
+
+  private
+
+  def perform_idempotently
+    return create_message if @params[:source_id].blank?
+
+    Message.transaction do
+      lock_source_id!
+      existing = @account.messages.find_by(source_id: @params[:source_id])
+      return backfill_attachments(existing) if existing
+
+      create_message
+    end
+  end
+
+  # This option is intentionally opt-in. It is used by the WhatsApp bridge,
+  # whose providers may redeliver the same external message concurrently.
+  # Keep the key scoped to the account so provider IDs from different accounts
+  # never block each other.
+  def lock_source_id!
+    return unless ActiveRecord::Base.connection.adapter_name.downcase.include?('postgres')
+
+    key = ActiveRecord::Base.connection.quote("#{@account.id}:#{@params[:source_id]}")
+    ActiveRecord::Base.connection.execute("SELECT pg_advisory_xact_lock(hashtext(#{key})::bigint)")
+  end
+
+  # A media download can fail after a text shell has been stored. A later
+  # delivery of the same provider message should complete that shell, not
+  # create a second message.
+  def backfill_attachments(existing)
+    return existing if @attachments.blank? || existing.attachments.exists?
+
+    @message = existing
+    process_attachments
+    @message.save!
+    @message
+  end
+
+  def create_message
     @message = @conversation.messages.build(message_params)
     process_attachments
     process_emails
@@ -32,7 +76,9 @@ class Messages::MessageBuilder
     @message
   end
 
-  private
+  def idempotent?
+    @idempotent
+  end
 
   # Extracts content attributes from the given params.
   # - Converts ActionController::Parameters to a regular hash if needed.

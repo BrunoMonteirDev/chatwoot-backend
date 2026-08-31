@@ -40,6 +40,17 @@ describe Messages::WhatsappHistoricalMessageImportService do
     expect(conversation.messages.where(source_id: payload[:source_id]).count).to eq(1)
   end
 
+  it 'reuses a historical message when the same source_id arrives in realtime' do
+    historical = described_class.new(account: account, conversation: conversation, payload: payload).perform.message
+
+    realtime = Messages::MessageBuilder.new(nil, conversation, ActionController::Parameters.new(
+      content: 'Mensagem antiga', message_type: 'incoming', source_id: payload[:source_id], idempotent: true
+    )).perform
+
+    expect(realtime).to eq(historical)
+    expect(account.messages.where(source_id: payload[:source_id]).count).to eq(1)
+  end
+
   it 'attaches recovered historical media to an already imported message without duplicating it' do
     existing = create(:message, account: account, conversation: conversation, inbox: inbox,
                                 source_id: 'waha:3EB0MEDIA', content: nil,

@@ -20,6 +20,64 @@ describe Messages::MessageBuilder do
       message = message_builder
       expect(message.content).to eq params[:content]
     end
+
+    it 'reuses an idempotent realtime message with the same account and source_id' do
+      idempotent_params = ActionController::Parameters.new(content: 'evento recebido', message_type: 'incoming', source_id: 'waha:evt-1', idempotent: true)
+
+      first = described_class.new(user, conversation, idempotent_params).perform
+      second = described_class.new(user, conversation, idempotent_params).perform
+
+      expect(second).to eq(first)
+      expect(account.messages.where(source_id: 'waha:evt-1').count).to eq(1)
+    end
+
+    it 'does not make source_id idempotent unless explicitly requested' do
+      params = ActionController::Parameters.new(content: 'evento recebido', source_id: 'waha:evt-legado')
+
+      described_class.new(user, conversation, params).perform
+      described_class.new(user, conversation, params).perform
+
+      expect(account.messages.where(source_id: 'waha:evt-legado').count).to eq(2)
+    end
+
+    it 'serializes simultaneous idempotent creates for the same source_id' do
+      skip 'requires PostgreSQL advisory locks' unless ActiveRecord::Base.connection.adapter_name.downcase.include?('postgres')
+
+      ready = Queue.new
+      start = Queue.new
+      workers = 2.times.map do
+        Thread.new do
+          ActiveRecord::Base.connection_pool.with_connection do
+            ready << true
+            start.pop
+            described_class.new(user, conversation, ActionController::Parameters.new(
+              content: 'evento concorrente', message_type: 'incoming', source_id: 'meta:wamid-concurrent', idempotent: true
+            )).perform.id
+          end
+        end
+      end
+      2.times { ready.pop }
+      2.times { start << true }
+
+      ids = workers.map(&:value)
+      expect(ids.uniq.length).to eq(1)
+      expect(account.messages.where(source_id: 'meta:wamid-concurrent').count).to eq(1)
+    end
+
+    it 'backfills a missing attachment instead of duplicating a realtime media message' do
+      source_id = 'waha:media-backfill'
+      described_class.new(user, conversation, ActionController::Parameters.new(
+        content: 'Mídia indisponível.', message_type: 'incoming', source_id: source_id, idempotent: true
+      )).perform
+      attachment = Rack::Test::UploadedFile.new('spec/assets/avatar.png', 'image/png')
+
+      message = described_class.new(user, conversation, ActionController::Parameters.new(
+        content: '', message_type: 'incoming', source_id: source_id, idempotent: true, attachments: [attachment]
+      )).perform
+
+      expect(account.messages.where(source_id: source_id).count).to eq(1)
+      expect(message.attachments.count).to eq(1)
+    end
   end
 
   describe '#content_attributes' do

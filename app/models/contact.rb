@@ -54,6 +54,7 @@ class Contact < ApplicationRecord
   validates :phone_number,
             allow_blank: true, uniqueness: { scope: [:account_id] },
             format: { with: /\+[1-9]\d{1,14}\z/, message: I18n.t('errors.contacts.phone_number.invalid') }
+  validate :canonical_brazilian_phone_number_is_unique
 
   belongs_to :account
   has_many :conversations, dependent: :destroy_async
@@ -62,7 +63,7 @@ class Contact < ApplicationRecord
   has_many :inboxes, through: :contact_inboxes
   has_many :messages, as: :sender, dependent: :destroy_async
   has_many :notes, dependent: :destroy_async
-  before_validation :prepare_contact_attributes
+  before_validation :normalize_brazilian_phone_number, :prepare_contact_attributes
   after_create_commit :dispatch_create_event, :ip_lookup
   after_update_commit :dispatch_update_event
   after_destroy_commit :dispatch_destroy_event
@@ -207,6 +208,25 @@ class Contact < ApplicationRecord
     return if phone_number.blank?
 
     self.phone_number = phone_number_was unless phone_number.match?(/\+[1-9]\d{1,14}\z/)
+  end
+
+  def normalize_brazilian_phone_number
+    return if phone_number.blank?
+
+    match = /\A\+55([1-9]\d)9(\d{8})\z/.match(phone_number)
+    self.phone_number = "+55#{match[1]}#{match[2]}" if match
+  end
+
+  def canonical_brazilian_phone_number_is_unique
+    return if phone_number.blank?
+
+    match = /\A\+55([1-9]\d)(\d{8})\z/.match(phone_number)
+    return unless match
+
+    with_additional_nine = "+55#{match[1]}9#{match[2]}"
+    return unless self.class.where(account_id: account_id, phone_number: [phone_number, with_additional_nine]).where.not(id: id).exists?
+
+    errors.add(:phone_number, :taken)
   end
 
   def email_format

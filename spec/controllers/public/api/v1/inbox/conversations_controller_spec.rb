@@ -95,6 +95,15 @@ RSpec.describe 'Public Inbox Contact Conversations API', type: :request do
       expect(data['id']).not_to be_nil
     end
 
+    it 'reuses the conversation when idempotent creation is requested' do
+      post "/public/api/v1/inboxes/#{api_channel.identifier}/contacts/#{contact_inbox.source_id}/conversations", params: { idempotent: true }
+      first_id = response.parsed_body['id']
+      post "/public/api/v1/inboxes/#{api_channel.identifier}/contacts/#{contact_inbox.source_id}/conversations", params: { idempotent: true }
+
+      expect(response.parsed_body['id']).to eq(first_id)
+      expect(contact.conversations.where(inbox_id: api_channel.inbox.id).count).to eq(1)
+    end
+
     it 'creates a conversation with custom attributes but prevents other attributes' do
       post "/public/api/v1/inboxes/#{api_channel.identifier}/contacts/#{contact_inbox.source_id}/conversations",
            params: { custom_attributes: { 'test' => 'test' }, additional_attributes: { 'test' => 'test' } }

@@ -2,6 +2,8 @@ class ConversationBuilder
   pattr_initialize [:params!, :contact_inbox!]
 
   def perform
+    return find_or_create_idempotently if params[:idempotent] == true
+
     look_up_exising_conversation || create_new_conversation
   end
 
@@ -15,6 +17,19 @@ class ConversationBuilder
 
   def create_new_conversation
     ::Conversation.create!(conversation_params)
+  end
+
+  # The API and public endpoints normally allow users to intentionally open
+  # multiple threads. Opt-in callers (the WhatsApp bridge and its frontend)
+  # instead need one stable thread per contact and inbox. Lock the contact row
+  # so this check and possible creation are atomic across processes.
+  def find_or_create_idempotently
+    @contact_inbox.contact.with_lock do
+      @contact_inbox.contact.conversations
+                    .where(inbox_id: @contact_inbox.inbox_id)
+                    .order(last_activity_at: :desc, id: :desc)
+                    .first || create_new_conversation
+    end
   end
 
   def conversation_params

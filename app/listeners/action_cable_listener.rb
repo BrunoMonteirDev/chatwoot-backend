@@ -175,6 +175,24 @@ class ActionCableListener < BaseListener
     broadcast(account, [account_token(account)], CONTACT_DELETED, contact_data)
   end
 
+  def inbox_created(event)
+    inbox, account = extract_inbox_and_account(event)
+    broadcast(account, [account_token(account)], INBOX_CREATED, inbox_event_data(inbox))
+  end
+
+  def inbox_updated(event)
+    inbox, account = extract_inbox_and_account(event)
+    broadcast(account, [account_token(account)], INBOX_UPDATED, inbox_event_data(inbox))
+  end
+
+  def conversation_deleted(event)
+    data = event.data[:conversation_data]
+    account = Account.find_by(id: data[:account_id])
+    return if account.blank?
+
+    broadcast(account, [account_token(account)], CONVERSATION_DELETED, data)
+  end
+
   def conversation_mentioned(event)
     conversation, account = extract_conversation_and_account(event)
     user = event.data[:user]
@@ -186,6 +204,22 @@ class ActionCableListener < BaseListener
 
   def account_token(account)
     "account_#{account.id}"
+  end
+
+  # Inbox events are not conversation payloads. Keep this shape aligned with
+  # the public inbox API so alternate frontends can update their local cache
+  # without a follow-up request.
+  def inbox_event_data(inbox)
+    {
+      id: inbox.id,
+      name: inbox.name,
+      avatar_url: inbox.avatar_url,
+      channel_type: inbox.channel_type,
+      channel_id: inbox.channel_id,
+      webhook_url: inbox.channel.try(:webhook_url),
+      inbox_identifier: inbox.channel.try(:identifier),
+      additional_attributes: inbox.channel.try(:additional_attributes) || {}
+    }
   end
 
   def typing_event_listener_tokens(account, conversation, user)

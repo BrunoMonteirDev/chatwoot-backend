@@ -48,6 +48,8 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController
 
   def update
     continue_update = false
+    channel_updated = false
+    inbox_updated = false
 
     ActiveRecord::Base.transaction do
       continue_update = update_branded_email_layout
@@ -56,11 +58,21 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController
       inbox_params = permitted_params.except(:channel, :csat_config)
       inbox_params[:csat_config] = format_csat_config(permitted_params[:csat_config]) if permitted_params[:csat_config].present?
       @inbox.update!(inbox_params)
+      inbox_updated = @inbox.previous_changes.present?
       update_inbox_working_hours
-      update_channel if channel_update_required?
+      if channel_update_required?
+        update_channel
+        channel_updated = true
+      end
     end
 
     return unless continue_update
+
+    # Channel::Api keeps WhatsApp connection state in additional_attributes,
+    # so an Inbox callback alone does not observe this update.
+    if channel_updated && !inbox_updated && ENV['ENABLE_INBOX_EVENTS'].present?
+      Rails.configuration.dispatcher.dispatch(Events::Types::INBOX_UPDATED, Time.zone.now, inbox: @inbox, changed_attributes: {})
+    end
   end
 
   def agent_bot

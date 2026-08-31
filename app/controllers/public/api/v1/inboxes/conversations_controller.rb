@@ -62,6 +62,6 @@ class Public::Api::V1::Inboxes::ConversationsController < Public::Api::V1::Inbox
   end
 
   def conversation_params
-    params.permit(custom_attributes: {})
+    params.permit(:idempotent, custom_attributes: {})
   end
 end
