@@ -13,10 +13,14 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   # Keep the custom dashboard on the same native configuration source without
   # exposing the App Secret or duplicating configuration in another service.
   def authorization_config
+    config_values = InstallationConfig.where(name: embedded_signup_config_keys).each_with_object({}) do |config, values|
+      values[config.name] = config.value
+    end
+
     render json: {
-      app_id: ENV.fetch('WHATSAPP_APP_ID', ''),
-      configuration_id: ENV.fetch('WHATSAPP_CONFIGURATION_ID', ''),
-      api_version: ENV.fetch('WHATSAPP_API_VERSION', 'v22.0')
+      app_id: embedded_signup_config_value(config_values, 'WHATSAPP_APP_ID', ''),
+      configuration_id: embedded_signup_config_value(config_values, 'WHATSAPP_CONFIGURATION_ID', ''),
+      api_version: embedded_signup_config_value(config_values, 'WHATSAPP_API_VERSION', 'v22.0')
     }
   end
 
@@ -31,6 +35,14 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   end
 
   private
+
+  def embedded_signup_config_keys
+    %w[WHATSAPP_APP_ID WHATSAPP_CONFIGURATION_ID WHATSAPP_API_VERSION]
+  end
+
+  def embedded_signup_config_value(config_values, key, default)
+    config_values[key].presence || ENV.fetch(key, default)
+  end
 
   def ensure_embedded_signup_enabled
     return unless ChatwootApp.chatwoot_cloud?
