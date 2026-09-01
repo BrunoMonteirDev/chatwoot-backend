@@ -260,6 +260,15 @@ describe Whatsapp::WebhookSetupService do
           expect { service.perform }.to raise_error(/Webhook setup failed/)
         end
       end
+
+      it 'keeps a channel requiring reauthorization marked as such' do
+        channel.prompt_reauthorization!
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          expect { service.perform }.to raise_error(/Webhook setup failed/)
+          expect(channel.reauthorization_required?).to be true
+        end
+      end
     end
 
     context 'when used during reauthorization flow' do
@@ -333,6 +342,16 @@ describe Whatsapp::WebhookSetupService do
         with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
           expect(Rails.logger).not_to receive(:error)
           service.perform
+        end
+      end
+
+      it 'clears a stale reauthorization flag only after the callback subscription succeeds' do
+        channel.prompt_reauthorization!
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          expect(channel.reauthorization_required?).to be true
+          service.perform
+          expect(channel.reauthorization_required?).to be false
         end
       end
     end
