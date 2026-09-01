@@ -276,20 +276,20 @@ RSpec.describe 'WhatsApp Authorization API', type: :request do
     end
 
     it 'returns only the public embedded signup configuration' do
-      create(:installation_config, name: 'WHATSAPP_APP_ID', value: 'public-app-id')
-      create(:installation_config, name: 'WHATSAPP_CONFIGURATION_ID', value: 'public-configuration-id')
-      create(:installation_config, name: 'WHATSAPP_API_VERSION', value: 'v23.0')
+      with_modified_env WHATSAPP_APP_ID: 'public-app-id',
+                        WHATSAPP_CONFIGURATION_ID: 'public-configuration-id',
+                        WHATSAPP_API_VERSION: 'v23.0' do
+        get "/api/v1/accounts/#{account.id}/whatsapp/authorization/config",
+            headers: agent.create_new_auth_token,
+            as: :json
 
-      get "/api/v1/accounts/#{account.id}/whatsapp/authorization/config",
-          headers: agent.create_new_auth_token,
-          as: :json
-
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body).to eq({
-                                           'app_id' => 'public-app-id',
-                                           'configuration_id' => 'public-configuration-id',
-                                           'api_version' => 'v23.0'
-                                         })
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body).to eq({
+                                             'app_id' => 'public-app-id',
+                                             'configuration_id' => 'public-configuration-id',
+                                             'api_version' => 'v23.0'
+                                           })
+      end
     end
   end
 
