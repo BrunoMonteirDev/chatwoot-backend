@@ -24,7 +24,11 @@ RSpec.describe Messages::ForwardMessageService do
     source_message.update!(content_attributes: { 'in_reply_to' => 123, 'whatsapp_edited' => true, 'whatsapp_previous_content' => 'Anterior' })
 
     expect(forward).to have_attributes(conversation: destination_conversation, content: 'Conteúdo atual', message_type: 'outgoing', private: false)
-    expect(forward.content_attributes).to include('forwarded_from_message_id' => source_message.id, 'forwarding_token' => token)
+    expect(forward.content_attributes).to include(
+      'forwarded_from_message_id' => source_message.id,
+      'forwarding_token' => token,
+      'whatsapp_is_forwarded' => true
+    )
     expect(forward.content_attributes).not_to include('in_reply_to', 'whatsapp_edited', 'whatsapp_previous_content')
   end
 

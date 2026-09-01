@@ -25,7 +25,14 @@ class Messages::ForwardMessageService
         content: source_message.content,
         private: false,
         sender: user,
-        content_attributes: { 'forwarding_token' => idempotency_token, 'forwarded_from_message_id' => source_message.id }
+        content_attributes: {
+          'forwarding_token' => idempotency_token,
+          'forwarded_from_message_id' => source_message.id,
+          # Keep the user-visible WhatsApp semantic on copied messages. The
+          # bridge and web UI use this same normalized key for provider-origin
+          # forwarded messages.
+          'whatsapp_is_forwarded' => true
+        }
       )
       source_message.attachments.each { |source_attachment| copy_attachment(source_attachment, message) }
       message
