@@ -12,7 +12,7 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   # The stock dashboard receives these public values through its HTML layout.
   # Keep the custom dashboard on the same native configuration source without
   # exposing the App Secret or duplicating configuration in another service.
-  def config
+  def authorization_config
     render json: {
       app_id: ENV.fetch('WHATSAPP_APP_ID', ''),
       configuration_id: ENV.fetch('WHATSAPP_CONFIGURATION_ID', ''),

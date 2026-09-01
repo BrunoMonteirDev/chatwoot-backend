@@ -385,7 +385,7 @@ Rails.application.routes.draw do
           end
 
           namespace :whatsapp do
-            get 'authorization/config', to: 'authorizations#config'
+            get 'authorization/config', to: 'authorizations#authorization_config'
             resource :authorization, only: [:create]
           end
 
