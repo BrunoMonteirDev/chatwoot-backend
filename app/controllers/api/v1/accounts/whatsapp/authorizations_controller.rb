@@ -7,6 +7,19 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   # POST /api/v1/accounts/:account_id/whatsapp/authorization
   # Handles both initial authorization and reauthorization
   # If inbox_id is present in params, it performs reauthorization
+  #
+  # GET /api/v1/accounts/:account_id/whatsapp/authorization/config
+  # The stock dashboard receives these public values through its HTML layout.
+  # Keep the custom dashboard on the same native configuration source without
+  # exposing the App Secret or duplicating configuration in another service.
+  def config
+    render json: {
+      app_id: GlobalConfigService.load('WHATSAPP_APP_ID', ''),
+      configuration_id: GlobalConfigService.load('WHATSAPP_CONFIGURATION_ID', ''),
+      api_version: GlobalConfigService.load('WHATSAPP_API_VERSION', 'v22.0')
+    }
+  end
+
   def create
     validate_embedded_signup_params!
     channel = process_embedded_signup
