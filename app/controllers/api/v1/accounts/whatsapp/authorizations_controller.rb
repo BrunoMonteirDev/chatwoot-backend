@@ -13,10 +13,12 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   # Keep the custom dashboard on the same native configuration source without
   # exposing the App Secret or duplicating configuration in another service.
   def config
+    config_values = InstallationConfig.where(name: embedded_signup_config_keys).pluck(:name, :value).to_h
+
     render json: {
-      app_id: GlobalConfigService.load('WHATSAPP_APP_ID', ''),
-      configuration_id: GlobalConfigService.load('WHATSAPP_CONFIGURATION_ID', ''),
-      api_version: GlobalConfigService.load('WHATSAPP_API_VERSION', 'v22.0')
+      app_id: embedded_signup_config_value(config_values, 'WHATSAPP_APP_ID', ''),
+      configuration_id: embedded_signup_config_value(config_values, 'WHATSAPP_CONFIGURATION_ID', ''),
+      api_version: embedded_signup_config_value(config_values, 'WHATSAPP_API_VERSION', 'v22.0')
     }
   end
 
@@ -31,6 +33,16 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   end
 
   private
+
+  def embedded_signup_config_keys
+    %w[WHATSAPP_APP_ID WHATSAPP_CONFIGURATION_ID WHATSAPP_API_VERSION]
+  end
+
+  # Unlike GlobalConfigService.load, this read-only endpoint must not create
+  # installation configuration rows or repeatedly reload installation_config.yml.
+  def embedded_signup_config_value(config_values, key, default)
+    config_values[key].presence || ENV.fetch(key, default)
+  end
 
   def ensure_embedded_signup_enabled
     return unless ChatwootApp.chatwoot_cloud?

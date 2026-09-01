@@ -266,6 +266,33 @@ RSpec.describe 'WhatsApp Authorization API', type: :request do
     end
   end
 
+  describe 'GET /api/v1/accounts/{account.id}/whatsapp/authorization/config' do
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    it 'requires authentication' do
+      get "/api/v1/accounts/#{account.id}/whatsapp/authorization/config", as: :json
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'returns only the public embedded signup configuration' do
+      create(:installation_config, name: 'WHATSAPP_APP_ID', value: 'public-app-id')
+      create(:installation_config, name: 'WHATSAPP_CONFIGURATION_ID', value: 'public-configuration-id')
+      create(:installation_config, name: 'WHATSAPP_API_VERSION', value: 'v23.0')
+
+      get "/api/v1/accounts/#{account.id}/whatsapp/authorization/config",
+          headers: agent.create_new_auth_token,
+          as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to eq({
+                                           'app_id' => 'public-app-id',
+                                           'configuration_id' => 'public-configuration-id',
+                                           'api_version' => 'v23.0'
+                                         })
+    end
+  end
+
   describe 'POST /api/v1/accounts/{account.id}/whatsapp/authorization with inbox_id (reauthorization)' do
     let(:whatsapp_channel) do
       channel = build(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
