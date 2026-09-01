@@ -1,6 +1,6 @@
 class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::Conversations::BaseController
   include PermissionAuthorization
-  before_action -> { require_inbox_permission!(@conversation.inbox, 'conversation_reply') }, only: [:create, :update, :destroy, :retry, :whatsapp_reaction]
+  before_action -> { require_inbox_permission!(@conversation.inbox, 'conversation_reply') }, only: [:create, :forward, :update, :destroy, :retry, :whatsapp_reaction]
   before_action :ensure_api_inbox, only: [:update, :whatsapp_reaction, :whatsapp_transport_metadata]
 
   def index
@@ -13,6 +13,21 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     @message = mb.perform
   rescue StandardError => e
     render_could_not_create_error(e.message)
+  end
+
+  def forward
+    destination = Current.account.conversations.find_by!(display_id: forward_params[:destination_conversation_id])
+    require_inbox_permission!(destination.inbox, 'conversation_reply') and return
+
+    @message = Messages::ForwardMessageService.new(
+      source_message: message,
+      destination_conversation: destination,
+      user: Current.user,
+      idempotency_token: forward_params[:idempotency_token]
+    ).perform
+    render :create
+  rescue Messages::ForwardMessageService::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   def update
@@ -87,6 +102,10 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
   def whatsapp_reaction_params
     params.permit(:source_id, reaction: [:sender_id, :emoji, :transport, :origin, :event_id])
+  end
+
+  def forward_params
+    params.permit(:id, :destination_conversation_id, :idempotency_token)
   end
 
   def whatsapp_transport_metadata_params

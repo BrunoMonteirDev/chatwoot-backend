@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_04_000003) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_28_130000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -52,10 +52,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_04_000003) do
     t.boolean "auto_offline", default: true, null: false
     t.bigint "custom_role_id"
     t.bigint "agent_capacity_policy_id"
+    t.bigint "permission_profile_id"
     t.index ["account_id", "user_id"], name: "uniq_user_id_per_account_id", unique: true
     t.index ["account_id"], name: "index_account_users_on_account_id"
     t.index ["agent_capacity_policy_id"], name: "index_account_users_on_agent_capacity_policy_id"
     t.index ["custom_role_id"], name: "index_account_users_on_custom_role_id"
+    t.index ["permission_profile_id"], name: "index_account_users_on_permission_profile_id"
     t.index ["user_id"], name: "index_account_users_on_user_id"
   end
 
@@ -1090,8 +1092,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_04_000003) do
     t.integer "inbox_id", null: false
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
+    t.bigint "permission_profile_id"
     t.index ["inbox_id", "user_id"], name: "index_inbox_members_on_inbox_id_and_user_id", unique: true
     t.index ["inbox_id"], name: "index_inbox_members_on_inbox_id"
+    t.index ["permission_profile_id"], name: "index_inbox_members_on_permission_profile_id"
   end
 
   create_table "inboxes", id: :serial, force: :cascade do |t|
@@ -1287,6 +1291,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_04_000003) do
     t.index ["secondary_actor_type", "secondary_actor_id"], name: "uniq_secondary_actor_per_account_notifications"
     t.index ["user_id", "account_id", "snoozed_until", "read_at"], name: "idx_notifications_performance"
     t.index ["user_id"], name: "index_notifications_on_user_id"
+  end
+
+  create_table "permission_profiles", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.string "description"
+    t.text "inbox_permissions", default: [], null: false, array: true
+    t.text "system_permissions", default: [], null: false, array: true
+    t.boolean "default", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "kind", default: "inbox", null: false
+    t.index ["account_id", "kind"], name: "index_permission_profiles_on_account_id_and_kind"
+    t.index ["account_id", "name"], name: "index_permission_profiles_on_account_id_and_name", unique: true
+    t.index ["account_id"], name: "index_permission_profiles_on_account_id"
   end
 
   create_table "platform_app_permissibles", force: :cascade do |t|
@@ -1557,9 +1576,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_04_000003) do
     t.index ["inbox_id"], name: "index_working_hours_on_inbox_id"
   end
 
+  add_foreign_key "account_users", "permission_profiles"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "inbox_members", "permission_profiles"
   add_foreign_key "inboxes", "portals"
+  add_foreign_key "permission_profiles", "accounts"
   add_foreign_key "user_sessions", "users"
   create_trigger("accounts_after_insert_row_tr", :generated => true, :compatibility => 1).
       on("accounts").

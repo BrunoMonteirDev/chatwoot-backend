@@ -170,6 +170,7 @@ Rails.application.routes.draw do
                   post :whatsapp_transport_metadata
                 end
                 collection do
+                  post :forward
                   # API inbox bridge operation. Reactions update an existing
                   # WhatsApp message; they are never Chatwoot chat messages.
                   post :whatsapp_reaction

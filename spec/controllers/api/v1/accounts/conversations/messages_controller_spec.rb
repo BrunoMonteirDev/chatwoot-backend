@@ -181,6 +181,60 @@ RSpec.describe 'Conversation Messages API', type: :request do
     end
   end
 
+  describe 'POST /api/v1/accounts/{account.id}/conversations/:conversation_id/messages/forward' do
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let(:source_inbox) do
+      create(:inbox, account: account,
+                     channel: build(:channel_api, account: account, additional_attributes: { 'whatsapp_transports' => ['evolution'] }))
+    end
+    let(:destination_inbox) do
+      create(:inbox, account: account,
+                     channel: build(:channel_api, account: account, additional_attributes: { 'whatsapp_transports' => ['waha'] }))
+    end
+    let(:source_conversation) { create(:conversation, account: account, inbox: source_inbox) }
+    let(:destination_conversation) { create(:conversation, account: account, inbox: destination_inbox) }
+    let(:source_message) do
+      create(:message, account: account, inbox: source_inbox, conversation: source_conversation, content: 'Encaminhar este texto')
+    end
+    let(:token) { '2f1ef99d-1a23-4f4e-9c0b-12f1fe8e4aa9' }
+
+    before do
+      create(:inbox_member, inbox: source_inbox, user: agent)
+      create(:inbox_member, inbox: destination_inbox, user: agent)
+    end
+
+    it 'creates one outgoing message in the permitted WhatsApp destination and is idempotent on retry' do
+      params = { id: source_message.id, destination_conversation_id: destination_conversation.display_id, idempotency_token: token }
+
+      post "/api/v1/accounts/#{account.id}/conversations/#{source_conversation.display_id}/messages/forward",
+           params: params, headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(destination_conversation.messages.last).to have_attributes(content: 'Encaminhar este texto', message_type: 'outgoing')
+
+      post "/api/v1/accounts/#{account.id}/conversations/#{source_conversation.display_id}/messages/forward",
+           params: params, headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(destination_conversation.messages.count { |message| message.content_attributes.to_h['forwarding_token'] == token }).to eq(1)
+    end
+
+    it 'forbids forwarding when the agent lacks reply permission on the destination inbox' do
+      restricted_profile = PermissionProfile.create!(
+        account: account, kind: :inbox, name: 'Somente leitura',
+        inbox_permissions: ['conversation_view_all'], system_permissions: []
+      )
+      destination_inbox.inbox_members.find_by!(user: agent).update!(permission_profile: restricted_profile)
+
+      post "/api/v1/accounts/#{account.id}/conversations/#{source_conversation.display_id}/messages/forward",
+           params: { id: source_message.id, destination_conversation_id: destination_conversation.display_id, idempotency_token: token },
+           headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:forbidden)
+      expect(destination_conversation.messages).to be_empty
+    end
+  end
+
   describe 'GET /api/v1/accounts/{account.id}/conversations/:id/messages' do
     let(:conversation) { create(:conversation, account: account) }
 
