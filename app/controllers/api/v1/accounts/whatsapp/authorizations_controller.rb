@@ -13,7 +13,7 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   # Keep the custom dashboard on the same native configuration source without
   # exposing the App Secret or duplicating configuration in another service.
   def config
-    config_values = InstallationConfig.where(name: embedded_signup_config_keys).pluck(:name, :value).to_h
+    config_values = InstallationConfig.where(name: embedded_signup_config_keys).index_by(&:name).transform_values(&:value)
 
     render json: {
       app_id: embedded_signup_config_value(config_values, 'WHATSAPP_APP_ID', ''),
