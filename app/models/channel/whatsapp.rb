@@ -97,8 +97,25 @@ class Channel::Whatsapp < ApplicationRecord
       'meta_connection_last_changed_at' => meta_connection_last_changed_at,
       'meta_connection_last_error' => meta_connection_last_error,
       'meta_account_update_event' => meta_account_update_event,
-      'meta_account_update_at' => meta_account_update_at
+      'meta_account_update_at' => meta_account_update_at,
+      'meta_history_status' => meta_history_status,
+      'meta_history_started_at' => meta_history_started_at,
+      'meta_history_completed_at' => meta_history_completed_at,
+      'meta_history_progress' => meta_history_progress,
+      'meta_history_error' => meta_history_error,
+      'meta_history_last_chunk' => meta_history_last_chunk,
+      'meta_history_action_available' => meta_history_action_available,
+      'meta_history_subscription_available' => meta_history_subscription_available,
+      'meta_onboarding_mode' => provider_config.to_h['onboarding_mode']
     }.compact
+  end
+
+  def coexistence?
+    provider == 'whatsapp_cloud' && provider_config.to_h['onboarding_mode'] == 'coexistence'
+  end
+
+  def history_eligible?
+    coexistence?
   end
 
   # Enables voice: turns calling on at Meta (idempotent), then re-registers webhooks

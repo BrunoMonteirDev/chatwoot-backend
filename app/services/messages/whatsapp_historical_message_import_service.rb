@@ -1,6 +1,6 @@
 class Messages::WhatsappHistoricalMessageImportService
   TRANSPORTS = %w[meta_cloud waha].freeze
-  MEDIA_TYPES = %w[image audio video document].freeze
+  MEDIA_TYPES = %w[image audio video document sticker].freeze
 
   Result = Data.define(:message, :created)
 
@@ -34,9 +34,10 @@ class Messages::WhatsappHistoricalMessageImportService
 
     Message.transaction do
       lock_source_id!
-      existing = account.messages.find_by(source_id: source_id)
+      existing = account.messages.where(inbox_id: conversation.inbox_id).find_by(source_id: source_id)
       if existing
         enrich_existing_media!(existing)
+        resolve_reply!(existing)
         return Result.new(message: existing, created: false)
       end
 
@@ -54,7 +55,7 @@ class Messages::WhatsappHistoricalMessageImportService
   attr_reader :account, :conversation, :payload, :attachment
 
   def validate!
-    raise ArgumentError, 'History import requires an API inbox' unless conversation.inbox.api?
+    raise ArgumentError, 'History import requires an API or native WhatsApp inbox' unless conversation.inbox.api? || native_whatsapp_inbox?
     raise ArgumentError, 'Invalid historical WhatsApp source ID' unless source_id.match?(source_id_pattern)
     raise ArgumentError, 'Invalid historical transport' unless TRANSPORTS.include?(transport)
     raise ArgumentError, 'Invalid historical message direction' unless %w[incoming outgoing].include?(direction)
@@ -67,10 +68,12 @@ class Messages::WhatsappHistoricalMessageImportService
   end
 
   def transport
-    payload.fetch('transport', source_id.start_with?('meta:') ? 'meta_cloud' : 'waha')
+    payload.fetch('transport', (native_meta? || source_id.start_with?('meta:')) ? 'meta_cloud' : 'waha')
   end
 
   def source_id_pattern
+    return /\Awamid\.[^\s]+\z/ if native_meta?
+
     transport == 'meta_cloud' ? /\Ameta:[^\s]+\z/ : /\Awaha:[^\s]+\z/
   end
 
@@ -100,7 +103,7 @@ class Messages::WhatsappHistoricalMessageImportService
     attributes['whatsapp_participant_name'] = payload['participant_name'] if payload['participant_name'].present?
     attributes['historical_media_unavailable'] = true if ActiveModel::Type::Boolean.new.cast(payload['historical_media_unavailable'])
     if payload['quoted_message_id'].present?
-      attributes['in_reply_to_external_id'] = "#{transport == 'meta_cloud' ? 'meta' : 'waha'}:#{payload['quoted_message_id']}"
+      attributes['in_reply_to_external_id'] = native_meta? ? payload['quoted_message_id'] : "#{transport == 'meta_cloud' ? 'meta' : 'waha'}:#{payload['quoted_message_id']}"
       attributes["#{transport == 'meta_cloud' ? 'meta' : 'waha'}_quoted_message_id"] = payload['quoted_message_id']
     end
     attributes
@@ -120,7 +123,7 @@ class Messages::WhatsappHistoricalMessageImportService
       sender_type: direction == 'incoming' ? 'Contact' : nil,
       sender_id: direction == 'incoming' ? conversation.contact_id : nil,
       source_id: source_id,
-      external_source_ids: { transport == 'meta_cloud' ? 'meta' : 'waha' => source_id.delete_prefix(transport == 'meta_cloud' ? 'meta:' : 'waha:') },
+      external_source_ids: { transport == 'meta_cloud' ? 'meta' : 'waha' => external_source_id },
       content_attributes: content_attributes,
       additional_attributes: { 'whatsapp_imported_history' => true },
       created_at: timestamp,
@@ -137,6 +140,7 @@ class Messages::WhatsappHistoricalMessageImportService
                 when 'image' then 'image'
                 when 'audio' then 'audio'
                 when 'video' then 'video'
+                when 'sticker' then 'image'
                 else 'file'
                 end
     Attachment.create!(account: account, message: message, file_type: file_type, file: attachment)
@@ -191,5 +195,20 @@ class Messages::WhatsappHistoricalMessageImportService
 
     quoted = ActiveRecord::Base.connection.quote("#{account.id}:#{source_id}")
     ActiveRecord::Base.connection.execute("SELECT pg_advisory_xact_lock(hashtext(#{quoted})::bigint)")
+  end
+
+  def native_meta?
+    ActiveModel::Type::Boolean.new.cast(payload['native_meta'])
+  end
+
+  def native_whatsapp_inbox?
+    channel = conversation.inbox.channel
+    channel.is_a?(Channel::Whatsapp) && channel.provider == 'whatsapp_cloud'
+  end
+
+  def external_source_id
+    return source_id if native_meta?
+
+    source_id.delete_prefix(transport == 'meta_cloud' ? 'meta:' : 'waha:')
   end
 end

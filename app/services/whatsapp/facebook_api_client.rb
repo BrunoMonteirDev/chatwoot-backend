@@ -92,6 +92,18 @@ class Whatsapp::FacebookApiClient
     handle_response(response, 'App subscription to WABA failed')
   end
 
+  def request_smb_app_data(phone_number_id, sync_type:)
+    raise ArgumentError, 'Invalid SMB sync type' unless %w[history].include?(sync_type)
+
+    response = HTTParty.post(
+      "#{BASE_URI}/#{@api_version}/#{phone_number_id}/smb_app_data",
+      headers: request_headers,
+      body: { messaging_product: 'whatsapp', sync_type: sync_type }.to_json
+    )
+
+    handle_response(response, 'SMB app data sync request failed')
+  end
+
   def override_phone_number_callback(phone_number_id, callback_url, verify_token)
     response = HTTParty.post(
       "#{BASE_URI}/#{@api_version}/#{phone_number_id}",

@@ -51,6 +51,17 @@ describe Messages::WhatsappHistoricalMessageImportService do
     expect(account.messages.where(source_id: payload[:source_id]).count).to eq(1)
   end
 
+  it 'imports native Meta history into Channel::Whatsapp with the raw WAMID for realtime convergence' do
+    native_channel = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', provider_config: { 'api_key' => 'x', 'phone_number_id' => 'phone', 'business_account_id' => 'waba', 'source' => 'embedded_signup', 'onboarding_mode' => 'coexistence' }, sync_templates: false, validate_provider_config: false)
+    native_conversation = create(:conversation, account: account, inbox: native_channel.inbox, contact: contact, contact_inbox: create(:contact_inbox, contact: contact, inbox: native_channel.inbox))
+    native_payload = payload.merge(source_id: 'wamid.native-history-1', native_meta: true)
+
+    result = described_class.new(account: account, conversation: native_conversation, payload: native_payload).perform
+
+    expect(result.message).to have_attributes(source_id: 'wamid.native-history-1')
+    expect(result.message.external_source_ids).to include('meta' => 'wamid.native-history-1')
+  end
+
   it 'attaches recovered historical media to an already imported message without duplicating it' do
     existing = create(:message, account: account, conversation: conversation, inbox: inbox,
                                 source_id: 'waha:3EB0MEDIA', content: nil,

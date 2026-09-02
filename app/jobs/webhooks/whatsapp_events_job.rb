@@ -8,6 +8,7 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
   def perform(params = {})
     channel = find_channel_from_whatsapp_business_payload(params)
 
+    return handle_history(channel, params) if history_event?(params)
     return handle_account_update(channel, params) if account_update_event?(params)
 
     if channel_is_inactive?(channel)
@@ -26,6 +27,25 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
     with_lock(key, 30.seconds) do
       process_events(channel, params)
     end
+  end
+
+  def history_event?(params)
+    params.dig(:entry, 0, :changes, 0, :field) == 'history'
+  end
+
+  # History is a Coexistence-only native flow. Require both the configured
+  # phone number and WABA entry id before queuing anything; a payload for a
+  # sibling WABA must never create contacts or messages in this inbox.
+  def handle_history(channel, params)
+    return unless native_history_channel?(channel, params)
+
+    Whatsapp::HistoryWebhookParser.new(params).events.each do |event|
+      next unless event[:phone_number_id].to_s == channel.provider_config['phone_number_id'].to_s
+
+      Channels::Whatsapp::HistoryChunkImportJob.perform_later(channel, event)
+    end
+  rescue StandardError => e
+    Rails.logger.warn("[WHATSAPP_HISTORY] Webhook ignored channel_id=#{channel&.id}: #{e.message}")
   end
 
   def process_events(channel, params)
@@ -230,6 +250,12 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
 
     Rails.logger.warn("[WHATSAPP] Ignored ambiguous account_update waba_id=#{waba_id}") if channels.many?
     nil
+  end
+
+  def native_history_channel?(channel, params)
+    return false unless channel&.history_eligible? && channel.account.active?
+
+    params.dig(:entry, 0, :id).to_s == channel.provider_config['business_account_id'].to_s
   end
 
   def account_update_name(params)

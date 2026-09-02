@@ -583,4 +583,31 @@ RSpec.describe Webhooks::WhatsappEventsJob do
       expect(channel.reload.meta_account_update_event).to be_nil
     end
   end
+
+  describe 'history' do
+    let(:history_channel) do
+      create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false,
+                                provider_config: { 'api_key' => 'x', 'phone_number_id' => 'history-phone', 'business_account_id' => 'history-waba',
+                                                   'source' => 'embedded_signup', 'onboarding_mode' => 'coexistence' })
+    end
+
+    def history_params(waba_id: history_channel.provider_config['business_account_id'], phone_number_id: history_channel.provider_config['phone_number_id'])
+      { object: 'whatsapp_business_account', entry: [{ id: waba_id, changes: [{ field: 'history', value: {
+        metadata: { phone_number_id: phone_number_id, display_phone_number: history_channel.phone_number.delete('+') },
+        history: [{ metadata: { phase: 1, chunk_order: 1, progress: 10 }, threads: [{ id: '5511988888888', messages: [{
+          id: 'wamid.history-1', from: '5511988888888', to: history_channel.phone_number.delete('+'), timestamp: '1710000001', type: 'text', text: { body: 'old' }
+        }] }] }]
+      } }] }] }
+    end
+
+    it 'queues native chunks only for the exact Coexistence WABA and does not create a Message in the webhook' do
+      expect do
+        expect { job.perform_now(history_params) }.to have_enqueued_job(Channels::Whatsapp::HistoryChunkImportJob).with(history_channel, kind_of(Hash))
+      end.not_to change(Message, :count)
+    end
+
+    it 'ignores a history payload for another WABA' do
+      expect { job.perform_now(history_params(waba_id: 'other-waba')) }.not_to have_enqueued_job(Channels::Whatsapp::HistoryChunkImportJob)
+    end
+  end
 end

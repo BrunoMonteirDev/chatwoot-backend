@@ -65,6 +65,7 @@ class Whatsapp::WebhookSetupService
     phone_number_id = @channel.provider_config['phone_number_id']
 
     @api_client.subscribe_phone_number_webhook(@waba_id, phone_number_id, callback_url, verify_token, subscribed_fields: subscribed_fields)
+    subscribe_history_webhook_if_eligible
     @channel.reauthorized!
   rescue StandardError => e
     Rails.logger.error("[WHATSAPP] Webhook setup failed: #{e.message}")
@@ -76,6 +77,22 @@ class Whatsapp::WebhookSetupService
     fields = %w[messages smb_message_echoes account_update]
     fields << 'calls' if calls_enabled_on_waba?
     fields
+  end
+
+  # `history` is an optional Coexistence capability. Keep the base messages
+  # subscription healthy when Meta declines the optional field (for example,
+  # outside its onboarding window). The second call deliberately repeats the
+  # complete WABA field set because Meta treats it as a replacement list.
+  def subscribe_history_webhook_if_eligible
+    return unless @channel.history_eligible?
+
+    @api_client.subscribe_app_to_waba(@waba_id, subscribed_fields: subscribed_fields + ['history'])
+    @channel.update_columns(meta_history_subscription_available: true, updated_at: @channel.updated_at) # rubocop:disable Rails/SkipsModelValidations
+    Whatsapp::HistoryStateService.new(@channel.reload).update!(state: 'available', action_available: false)
+  rescue StandardError => e
+    @channel.update_columns(meta_history_subscription_available: false, updated_at: @channel.updated_at) # rubocop:disable Rails/SkipsModelValidations
+    Whatsapp::HistoryStateService.new(@channel.reload).update!(state: 'failed', error: "History subscription unavailable: #{e.message}", action_available: false)
+    Rails.logger.warn("[WHATSAPP_HISTORY] Optional subscription failed channel_id=#{@channel.id} inbox_id=#{@channel.inbox&.id}: #{e.message}")
   end
 
   # `subscribed_fields` is a WABA-wide app subscription, so keep `calls` whenever this inbox or

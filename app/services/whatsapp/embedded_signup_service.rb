@@ -22,6 +22,10 @@ class Whatsapp::EmbeddedSignupService
     # 3. The channel is marked with source: 'embedded_signup' to skip the after_commit callback
     channel.setup_webhooks
     Whatsapp::OperationalStateService.new(channel).update!(state: 'connected', checked_at: Time.current, error: nil)
+    # Meta permits the history request only during the new Coexistence
+    # onboarding window. Reauthorization must not reset or replay that
+    # one-shot request.
+    Channels::Whatsapp::HistorySyncRequestJob.perform_later(channel) if @inbox_id.blank? && channel.history_eligible? && channel.meta_history_subscription_available?
     # Skip health check during reauthorization — phone numbers in pending provisioning state
     # (platform_type: NOT_APPLICABLE) would incorrectly trigger a disconnect email right after
     # a successful reauth. Only run health check for new channel creation.

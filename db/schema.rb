@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_02_190000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_02_193000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -720,6 +720,14 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_02_190000) do
     t.string "meta_connection_last_error", limit: 500
     t.string "meta_account_update_event", limit: 100
     t.datetime "meta_account_update_at"
+    t.string "meta_history_status", default: "not_eligible", null: false
+    t.datetime "meta_history_started_at"
+    t.datetime "meta_history_completed_at"
+    t.integer "meta_history_progress"
+    t.string "meta_history_error"
+    t.string "meta_history_last_chunk"
+    t.boolean "meta_history_action_available", default: false, null: false
+    t.boolean "meta_history_subscription_available", default: false, null: false
     t.index ["phone_number"], name: "index_channel_whatsapp_on_phone_number", unique: true
     t.index ["phone_number_health_checked_at"], name: "index_channel_whatsapp_on_phone_number_health_checked_at"
   end
