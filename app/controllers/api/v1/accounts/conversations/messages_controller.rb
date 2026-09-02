@@ -1,6 +1,6 @@
 class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::Conversations::BaseController
   include PermissionAuthorization
-  before_action -> { require_inbox_permission!(@conversation.inbox, 'conversation_reply') }, only: [:create, :forward, :update, :destroy, :retry, :whatsapp_reaction]
+  before_action -> { require_inbox_permission!(@conversation.inbox, 'conversation_reply') }, only: [:create, :forward, :update, :destroy, :retry, :whatsapp_reaction, :native_whatsapp_reaction]
   before_action :ensure_api_inbox, only: [:update, :whatsapp_reaction, :whatsapp_transport_metadata]
 
   def index
@@ -57,6 +57,18 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     @message = @conversation.messages.find_by!(source_id: whatsapp_reaction_params[:source_id])
     Messages::WhatsappReactionUpdateService.new(@message, whatsapp_reaction_params[:reaction].to_h).perform
     render :update
+  end
+
+  def native_whatsapp_reaction
+    @message = message
+    # An empty emoji is the Cloud API's explicit reaction-removal operation;
+    # `params.require` incorrectly treats that valid value as missing.
+    raise ActionController::ParameterMissing, :emoji unless params.key?(:emoji)
+
+    Whatsapp::ReactionService.new(message: @message, emoji: params[:emoji], user: Current.user || @resource).perform
+    render :update
+  rescue Whatsapp::ReactionService::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   def whatsapp_transport_metadata

@@ -138,6 +138,32 @@ describe Whatsapp::Providers::WhatsappCloudService do
     end
   end
 
+  describe '#send_reaction' do
+    it 'sends a reaction using the target WAMID without creating a message' do
+      stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages').with(
+        body: { messaging_product: 'whatsapp', recipient_type: 'individual', to: '+123456789', type: 'reaction', reaction: { message_id: 'wamid.target', emoji: '👍' } }.to_json
+      ).to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      expect(service.send_reaction('+123456789', 'wamid.target', '👍')).to eq(whatsapp_response.deep_stringify_keys)
+    end
+
+    it 'uses an empty emoji to remove a reaction' do
+      stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages').with(
+        body: hash_including(reaction: { message_id: 'wamid.target', emoji: '' })
+      ).to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      service.send_reaction('+123456789', 'wamid.target', '')
+    end
+
+    it 'raises a scoped Graph error without changing inbox state' do
+      stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+        .to_return(status: 400, body: { error: { message: 'Invalid reaction target' } }.to_json, headers: response_headers)
+
+      expect { service.send_reaction('+123456789', 'wamid.target', '👍') }
+        .to raise_error(Whatsapp::Providers::WhatsappCloudService::ReactionError, /HTTP 400.*Invalid reaction target/)
+    end
+  end
+
   describe '#send_interactive message' do
     context 'when called' do
       it 'calls message endpoints with button payload when number of items is less than or equal to 3' do

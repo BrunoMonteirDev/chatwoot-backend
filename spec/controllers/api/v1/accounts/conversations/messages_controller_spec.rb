@@ -434,4 +434,63 @@ RSpec.describe 'Conversation Messages API', type: :request do
       end
     end
   end
+
+  describe 'POST /api/v1/accounts/{account.id}/conversations/:conversation_id/messages/:id/native_whatsapp_reaction' do
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false) }
+    let(:contact_inbox) { create(:contact_inbox, inbox: channel.inbox, source_id: '5511999999999') }
+    let(:conversation) { create(:conversation, account: account, inbox: channel.inbox, contact_inbox: contact_inbox) }
+    let(:message) { create(:message, account: account, inbox: channel.inbox, conversation: conversation, source_id: 'wamid.target') }
+    let(:url) { "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{message.id}/native_whatsapp_reaction" }
+    let(:reaction_service) { instance_double(Whatsapp::ReactionService, perform: message) }
+
+    before do
+      create(:inbox_member, inbox: channel.inbox, user: agent)
+      allow(Whatsapp::ReactionService).to receive(:new).and_return(reaction_service)
+    end
+
+    it 'requires authentication' do
+      post url, params: { emoji: '👍' }, as: :json
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'requires conversation reply permission' do
+      restricted_profile = PermissionProfile.create!(
+        account: account, kind: :inbox, name: 'Reaction read only',
+        inbox_permissions: ['conversation_view_all'], system_permissions: []
+      )
+      channel.inbox.inbox_members.find_by!(user: agent).update!(permission_profile: restricted_profile)
+      post url, params: { emoji: '👍' }, headers: agent.create_new_auth_token, as: :json
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it 'uses the scoped native reaction service and creates no chat message' do
+      expect do
+        post url, params: { emoji: '👍' }, headers: agent.create_new_auth_token, as: :json
+      end.not_to change(Message, :count)
+      expect(Whatsapp::ReactionService).to have_received(:new).with(message: message, emoji: '👍', user: agent)
+      expect(response).to have_http_status(:success)
+    end
+
+    it 'does not resolve a message from a different conversation or account' do
+      other_conversation = create(:conversation, account: account, inbox: channel.inbox)
+      other_message = create(:message, account: account, inbox: channel.inbox, conversation: other_conversation, source_id: 'wamid.other')
+      post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{other_message.id}/native_whatsapp_reaction",
+           params: { emoji: '👍' }, headers: agent.create_new_auth_token, as: :json
+      expect(response).to have_http_status(:not_found)
+
+      foreign_account = create(:account)
+      foreign_conversation = create(:conversation, account: foreign_account)
+      post "/api/v1/accounts/#{account.id}/conversations/#{foreign_conversation.display_id}/messages/#{other_message.id}/native_whatsapp_reaction",
+           params: { emoji: '👍' }, headers: agent.create_new_auth_token, as: :json
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'returns a controlled Graph reaction error' do
+      allow(reaction_service).to receive(:perform).and_raise(Whatsapp::ReactionService::Error, 'Meta reaction rejected')
+      post url, params: { emoji: '' }, headers: agent.create_new_auth_token, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body).to include('error' => 'Meta reaction rejected')
+    end
+  end
 end

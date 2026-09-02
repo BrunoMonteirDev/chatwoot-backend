@@ -1,4 +1,18 @@
 class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseService
+  class ReactionError < StandardError; end
+
+  def send_reaction(phone_number, target_message_id, emoji)
+    response = HTTParty.post(
+      "#{phone_id_path('v24.0')}/messages",
+      headers: api_headers,
+      body: { messaging_product: 'whatsapp', recipient_type: 'individual', **recipient_params(phone_number), type: 'reaction', reaction: { message_id: target_message_id, emoji: emoji } }.to_json
+    )
+    return response.parsed_response if response.success?
+
+    error = response.parsed_response.is_a?(Hash) ? response.parsed_response.dig('error', 'message') : nil
+    raise ReactionError, "Meta reaction rejected (HTTP #{response.code}): #{error || 'unknown error'}"
+  end
+
   def send_message(phone_number, message)
     @message = message
 

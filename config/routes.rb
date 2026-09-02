@@ -170,6 +170,7 @@ Rails.application.routes.draw do
                   post :translate
                   post :retry
                   post :whatsapp_transport_metadata
+                  post :native_whatsapp_reaction
                 end
                 collection do
                   post :forward

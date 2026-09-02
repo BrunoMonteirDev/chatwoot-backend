@@ -290,6 +290,69 @@ RSpec.describe Webhooks::WhatsappEventsJob do
       end.not_to change(Message, :count)
     end
 
+    context 'with Meta reaction webhooks' do
+      def reaction_webhook(channel:, target_wamid:, emoji:, author: '5511999999999', event_id: 'wamid.reaction-1')
+        {
+          object: 'whatsapp_business_account', phone_number: channel.phone_number,
+          entry: [{ changes: [{ field: 'messages', value: {
+            metadata: { phone_number_id: channel.provider_config['phone_number_id'], display_phone_number: channel.phone_number.delete('+') },
+            messages: [{ id: event_id, from: author, type: 'reaction', reaction: { message_id: target_wamid, emoji: emoji } }]
+          } }] }]
+        }.with_indifferent_access
+      end
+
+      def message_for(channel, wamid: 'wamid.target', attributes: {})
+        conversation = create(:conversation, account: channel.account, inbox: channel.inbox)
+        create(:message, account: channel.account, inbox: channel.inbox, conversation: conversation, source_id: wamid, content_attributes: attributes)
+      end
+
+      it 'updates incoming and outgoing targets without creating a message' do
+        incoming = message_for(channel, wamid: 'wamid.incoming')
+        outgoing = message_for(channel, wamid: 'wamid.outgoing')
+        outgoing.outgoing!
+
+        expect { job.perform_now(reaction_webhook(channel: channel, target_wamid: incoming.source_id, emoji: '👍')) }.not_to change(Message, :count)
+        job.perform_now(reaction_webhook(channel: channel, target_wamid: outgoing.source_id, emoji: '❤️', event_id: 'wamid.reaction-2'))
+
+        expect(incoming.reload.content_attributes['whatsapp_reactions']).to include(hash_including('sender_id' => 'contact:5511999999999', 'emoji' => '👍'))
+        expect(outgoing.reload.content_attributes['whatsapp_reactions']).to include(hash_including('sender_id' => 'contact:5511999999999', 'emoji' => '❤️'))
+      end
+
+      it 'keeps authors isolated, replaces an author emoji, and removes only that author' do
+        target = message_for(channel)
+        job.perform_now(reaction_webhook(channel: channel, target_wamid: target.source_id, emoji: '👍', author: '5511000000001', event_id: 'wamid.1'))
+        job.perform_now(reaction_webhook(channel: channel, target_wamid: target.source_id, emoji: '❤️', author: '5511000000002', event_id: 'wamid.2'))
+        job.perform_now(reaction_webhook(channel: channel, target_wamid: target.source_id, emoji: '😂', author: '5511000000001', event_id: 'wamid.3'))
+
+        expect(target.reload.content_attributes['whatsapp_reactions']).to contain_exactly(
+          hash_including('sender_id' => 'contact:5511000000001', 'emoji' => '😂'),
+          hash_including('sender_id' => 'contact:5511000000002', 'emoji' => '❤️')
+        )
+
+        job.perform_now(reaction_webhook(channel: channel, target_wamid: target.source_id, emoji: '', author: '5511000000001', event_id: 'wamid.4'))
+        expect(target.reload.content_attributes['whatsapp_reactions']).to contain_exactly(hash_including('sender_id' => 'contact:5511000000002', 'emoji' => '❤️'))
+      end
+
+      it 'is idempotent and cannot cross inbox or account boundaries' do
+        target = message_for(channel)
+        other_inbox_channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+        same_wamid_in_other_inbox = message_for(other_inbox_channel, wamid: target.source_id)
+        other_account_channel = create(:channel_whatsapp, account: create(:account), provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+        same_wamid_in_other_account = message_for(other_account_channel, wamid: target.source_id)
+        webhook = reaction_webhook(channel: channel, target_wamid: target.source_id, emoji: '👍')
+
+        2.times { job.perform_now(webhook) }
+
+        expect(target.reload.content_attributes['whatsapp_reactions']).to contain_exactly(hash_including('sender_id' => 'contact:5511999999999', 'emoji' => '👍'))
+        expect(same_wamid_in_other_inbox.reload.content_attributes['whatsapp_reactions']).to be_nil
+        expect(same_wamid_in_other_account.reload.content_attributes['whatsapp_reactions']).to be_nil
+      end
+
+      it 'ignores an unknown WAMID without creating a message or reaction target' do
+        expect { job.perform_now(reaction_webhook(channel: channel, target_wamid: 'wamid.missing', emoji: '👍')) }.not_to change(Message, :count)
+      end
+    end
+
     it 'ignore reaction type message, would not create contact if the reaction is the first event' do
       other_channel = create(:channel_whatsapp, phone_number: '+1987654', provider: 'whatsapp_cloud', sync_templates: false,
                                                 validate_provider_config: false)

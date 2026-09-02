@@ -27,11 +27,33 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
   end
 
   def process_events(channel, params)
-    if message_echo_event?(params)
+    if reaction_event?(params)
+      handle_reaction(channel, params)
+    elsif message_echo_event?(params)
       handle_message_echo(channel, params)
     else
       handle_message_events(channel, params)
     end
+  end
+
+  def reaction_event?(params)
+    params.dig(:entry, 0, :changes, 0, :value, :messages, 0, :type) == 'reaction'
+  end
+
+  def handle_reaction(channel, params)
+    reaction_message = params.dig(:entry, 0, :changes, 0, :value, :messages, 0) || {}
+    reaction = reaction_message[:reaction] || {}
+    return unless reaction.key?(:emoji) && reaction[:message_id].present? && reaction_message[:from].present?
+    target = channel.inbox.messages.find_by(source_id: reaction[:message_id])
+    return if target.blank?
+
+    Messages::WhatsappReactionUpdateService.new(
+      target,
+      sender_id: "contact:#{reaction_message[:from]}", emoji: reaction[:emoji].to_s,
+      transport: 'meta_cloud', origin: 'contact', event_id: reaction_message[:id]
+    ).perform
+  rescue ArgumentError => e
+    Rails.logger.warn("[WHATSAPP] Ignored reaction: #{e.message}")
   end
 
   # Detects if the webhook is an SMB message echo event (message sent from WhatsApp Business app)
