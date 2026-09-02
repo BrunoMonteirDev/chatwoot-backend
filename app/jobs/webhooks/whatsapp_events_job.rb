@@ -43,7 +43,9 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
   def handle_reaction(channel, params)
     reaction_message = params.dig(:entry, 0, :changes, 0, :value, :messages, 0) || {}
     reaction = reaction_message[:reaction] || {}
-    return unless reaction.key?(:emoji) && reaction[:message_id].present? && reaction_message[:from].present?
+    # Meta omits `emoji` entirely when a user removes a reaction. An absent
+    # emoji is therefore the same removal operation as an empty emoji.
+    return unless reaction[:message_id].present? && reaction_message[:from].present?
     target = channel.inbox.messages.find_by(source_id: reaction[:message_id])
     return if target.blank?
 

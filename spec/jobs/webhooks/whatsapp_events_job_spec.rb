@@ -291,12 +291,15 @@ RSpec.describe Webhooks::WhatsappEventsJob do
     end
 
     context 'with Meta reaction webhooks' do
-      def reaction_webhook(channel:, target_wamid:, emoji:, author: '5511999999999', event_id: 'wamid.reaction-1')
+      def reaction_webhook(channel:, target_wamid:, emoji: :present, author: '5511999999999', event_id: 'wamid.reaction-1')
+        reaction = { message_id: target_wamid }
+        reaction[:emoji] = emoji unless emoji == :absent
+
         {
           object: 'whatsapp_business_account', phone_number: channel.phone_number,
           entry: [{ changes: [{ field: 'messages', value: {
             metadata: { phone_number_id: channel.provider_config['phone_number_id'], display_phone_number: channel.phone_number.delete('+') },
-            messages: [{ id: event_id, from: author, type: 'reaction', reaction: { message_id: target_wamid, emoji: emoji } }]
+            messages: [{ id: event_id, from: author, type: 'reaction', reaction: reaction }]
           } }] }]
         }.with_indifferent_access
       end
@@ -331,6 +334,15 @@ RSpec.describe Webhooks::WhatsappEventsJob do
 
         job.perform_now(reaction_webhook(channel: channel, target_wamid: target.source_id, emoji: '', author: '5511000000001', event_id: 'wamid.4'))
         expect(target.reload.content_attributes['whatsapp_reactions']).to contain_exactly(hash_including('sender_id' => 'contact:5511000000002', 'emoji' => '❤️'))
+      end
+
+      it 'removes a reaction when Meta omits emoji from the removal webhook' do
+        target = message_for(channel)
+        job.perform_now(reaction_webhook(channel: channel, target_wamid: target.source_id, emoji: '😂'))
+
+        job.perform_now(reaction_webhook(channel: channel, target_wamid: target.source_id, emoji: :absent, event_id: 'wamid.removal'))
+
+        expect(target.reload.content_attributes['whatsapp_reactions']).to be_empty
       end
 
       it 'is idempotent and cannot cross inbox or account boundaries' do
