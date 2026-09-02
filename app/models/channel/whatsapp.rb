@@ -10,6 +10,10 @@
 #  phone_number_health            :jsonb            not null
 #  phone_number_health_checked_at :datetime
 #  phone_number_health_error      :string
+#  meta_connection_status         :string           default("connected"), not null
+#  meta_connection_last_checked_at :datetime
+#  meta_connection_last_changed_at :datetime
+#  meta_connection_last_error     :string
 #  provider                       :string           default("default")
 #  provider_config                :jsonb
 #  created_at                     :datetime         not null
@@ -84,6 +88,17 @@ class Channel::Whatsapp < ApplicationRecord
 
   def serializable_hash(options = nil)
     super.except('business_management_token')
+  end
+
+  def operational_status_attributes
+    {
+      'meta_connection_status' => meta_connection_status,
+      'meta_connection_last_checked_at' => meta_connection_last_checked_at,
+      'meta_connection_last_changed_at' => meta_connection_last_changed_at,
+      'meta_connection_last_error' => meta_connection_last_error,
+      'meta_account_update_event' => meta_account_update_event,
+      'meta_account_update_at' => meta_account_update_at
+    }.compact
   end
 
   # Enables voice: turns calling on at Meta (idempotent), then re-registers webhooks

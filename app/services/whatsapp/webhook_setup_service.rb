@@ -4,7 +4,7 @@ class Whatsapp::WebhookSetupService
     @waba_id = waba_id || channel.provider_config['business_account_id']
     @access_token = access_token || channel.provider_config['api_key']
     @api_client = Whatsapp::FacebookApiClient.new(@access_token)
-    @is_coexistence = is_coexistence.nil? ? channel.provider_config['onboarding_mode'] == 'coexistence' : is_coexistence
+    @is_coexistence = is_coexistence.nil? ? channel&.provider_config&.[]('onboarding_mode') == 'coexistence' : is_coexistence
   end
 
   def perform
@@ -73,7 +73,7 @@ class Whatsapp::WebhookSetupService
 
   # Subscribe to `calls` only when voice calling is enabled on the inbox
   def subscribed_fields
-    fields = %w[messages smb_message_echoes]
+    fields = %w[messages smb_message_echoes account_update]
     fields << 'calls' if calls_enabled_on_waba?
     fields
   end

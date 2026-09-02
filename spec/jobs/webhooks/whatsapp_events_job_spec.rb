@@ -534,4 +534,53 @@ RSpec.describe Webhooks::WhatsappEventsJob do
       job.perform_now(wb_params)
     end
   end
+
+  describe 'account_update' do
+    def account_update_params(event = 'ACCOUNT_OFFBOARDED')
+      {
+        object: 'whatsapp_business_account',
+        entry: [{
+          changes: [{
+            field: 'account_update',
+            value: {
+              metadata: { phone_number_id: channel.provider_config['phone_number_id'], display_phone_number: channel.phone_number.delete('+') },
+              event: event,
+              reason: 'Partner disconnected the account'
+            }
+          }]
+        }]
+      }
+    end
+
+    it 'marks the matching Cloud inbox disconnected without creating a Message' do
+      expect do
+        job.perform_now(account_update_params)
+      end.not_to change(Message, :count)
+
+      expect(channel.reload.meta_connection_status).to eq('disconnected')
+      expect(channel.meta_account_update_event).to eq('ACCOUNT_OFFBOARDED')
+      expect(channel.meta_connection_last_error).to eq('Partner disconnected the account')
+    end
+
+    it 'treats PARTNER_REMOVED as disconnected' do
+      job.perform_now(account_update_params('PARTNER_REMOVED'))
+
+      expect(channel.reload.meta_connection_status).to eq('disconnected')
+      expect(channel.meta_account_update_event).to eq('PARTNER_REMOVED')
+    end
+
+    it 'moves ACCOUNT_RECONNECTED to connecting and queues a read-only check' do
+      params = account_update_params('ACCOUNT_RECONNECTED')
+
+      expect { job.perform_now(params) }.to have_enqueued_job(Channels::Whatsapp::ConnectionCheckJob).with(channel)
+      expect(channel.reload.meta_connection_status).to eq('connecting')
+    end
+
+    it 'ignores unknown lifecycle events and does not create messages' do
+      params = account_update_params('FUTURE_EVENT')
+
+      expect { job.perform_now(params) }.not_to change(Message, :count)
+      expect(channel.reload.meta_account_update_event).to be_nil
+    end
+  end
 end

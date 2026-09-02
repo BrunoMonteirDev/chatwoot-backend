@@ -8,6 +8,8 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
   def perform(params = {})
     channel = find_channel_from_whatsapp_business_payload(params)
 
+    return handle_account_update(channel, params) if account_update_event?(params)
+
     if channel_is_inactive?(channel)
       Rails.logger.warn("Inactive WhatsApp channel: #{channel&.phone_number || "unknown - #{params[:phone_number]}"}")
       return
@@ -33,6 +35,31 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
       handle_message_echo(channel, params)
     else
       handle_message_events(channel, params)
+    end
+  end
+
+  # Account lifecycle updates have no message sender and must never enter the
+  # incoming-message parser. Meta can add fields over time, so only known strong
+  # signals change state; unknown events are recorded safely and ignored.
+  def account_update_event?(params)
+    params.dig(:entry, 0, :changes, 0, :field) == 'account_update'
+  end
+
+  def handle_account_update(channel, params)
+    return if channel.blank? || channel.provider != 'whatsapp_cloud' || !channel.account.active?
+
+    event = account_update_name(params)
+    return if event.blank?
+
+    state = Whatsapp::OperationalStateService.new(channel)
+    case event
+    when 'ACCOUNT_OFFBOARDED', 'PARTNER_REMOVED'
+      state.update!(state: 'disconnected', event: event, error: safe_account_update_reason(params))
+    when 'ACCOUNT_RECONNECTED'
+      state.update!(state: 'connecting', event: event, error: nil)
+      Channels::Whatsapp::ConnectionCheckJob.perform_later(channel)
+    else
+      Rails.logger.info("[WHATSAPP] Ignored account_update channel_id=#{channel.id} inbox_id=#{channel.inbox&.id} event=#{event}")
     end
   end
 
@@ -181,10 +208,40 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
 
   def get_channel_from_wb_payload(wb_params)
     metadata = wb_params[:entry].first[:changes].first.dig(:value, :metadata) || {}
+    return channel_from_waba_id(wb_params) if metadata[:phone_number_id].blank?
+
     Whatsapp::WebhookChannelFinderService.new(
       display_phone_number: metadata[:display_phone_number],
       phone_number_id: metadata[:phone_number_id]
     ).perform
+  end
+
+  def channel_from_waba_id(wb_params)
+    waba_id = wb_params.dig(:entry, 0, :id).to_s
+    return if waba_id.blank?
+
+    # A WABA can contain more than one inbox. account_update is only actionable
+    # when it resolves to exactly one configured channel; ambiguity is logged and
+    # deliberately does not leak state between inboxes.
+    channels = Channel::Whatsapp.where(provider: 'whatsapp_cloud')
+                                .where("provider_config->>'business_account_id' = ?", waba_id)
+                                .limit(2)
+    return channels.first if channels.one?
+
+    Rails.logger.warn("[WHATSAPP] Ignored ambiguous account_update waba_id=#{waba_id}") if channels.many?
+    nil
+  end
+
+  def account_update_name(params)
+    value = params.dig(:entry, 0, :changes, 0, :value) || {}
+    raw = value[:event] || value[:type] || value[:status] || value.dig(:account_update, :event)
+    raw.to_s.upcase.presence
+  end
+
+  def safe_account_update_reason(params)
+    value = params.dig(:entry, 0, :changes, 0, :value) || {}
+    raw = value[:reason] || value[:message] || value.dig(:error, :message)
+    raw.to_s.gsub(/[\r\n]/, ' ').truncate(500).presence
   end
 end
 
