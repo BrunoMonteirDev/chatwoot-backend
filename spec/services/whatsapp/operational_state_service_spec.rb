@@ -30,4 +30,13 @@ RSpec.describe Whatsapp::OperationalStateService do
   it 'rejects unknown states' do
     expect { described_class.new(channel).update!(state: 'unknown') }.to raise_error(ArgumentError, 'Invalid WhatsApp operational state')
   end
+
+  it 'records the initial change timestamp for migrated connected inboxes' do
+    expect(channel.meta_connection_status).to eq('connected')
+    expect(channel.meta_connection_last_changed_at).to be_nil
+
+    described_class.new(channel).update!(state: 'connected', checked_at: Time.current)
+
+    expect(channel.reload.meta_connection_last_changed_at).to be_present
+  end
 end

@@ -14,7 +14,7 @@ class Whatsapp::OperationalStateService
       meta_connection_last_error: error&.to_s&.truncate(500)
     }
     attributes[:meta_connection_last_checked_at] = checked_at if checked_at.present?
-    attributes[:meta_connection_last_changed_at] = now if @channel.meta_connection_status != state
+    attributes[:meta_connection_last_changed_at] = now if @channel.meta_connection_status != state || @channel.meta_connection_last_changed_at.blank?
     if event.present? && (@channel.meta_account_update_event != event || @channel.meta_account_update_at.blank?)
       attributes[:meta_account_update_event] = event
       attributes[:meta_account_update_at] = now
