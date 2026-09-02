@@ -49,4 +49,29 @@ RSpec.describe Whatsapp::ReauthorizationService do
 
     expect(channel.reload.business_management_token).to eq('business-token')
   end
+
+  it 'keeps reauthorization required until webhook setup succeeds' do
+    channel.prompt_reauthorization!
+
+    described_class.new(
+      account: account,
+      inbox_id: inbox.id,
+      phone_number_id: 'new-phone-id',
+      waba_id: channel.provider_config['business_account_id']
+    ).perform('new-token', phone_info)
+
+    expect(channel.reload.reauthorization_required?).to be(true)
+  end
+
+  it 'persists an explicit coexistence onboarding mode' do
+    described_class.new(
+      account: account,
+      inbox_id: inbox.id,
+      phone_number_id: 'new-phone-id',
+      waba_id: channel.provider_config['business_account_id'],
+      onboarding_mode: 'coexistence'
+    ).perform('new-token', phone_info)
+
+    expect(channel.reload.provider_config['onboarding_mode']).to eq('coexistence')
+  end
 end

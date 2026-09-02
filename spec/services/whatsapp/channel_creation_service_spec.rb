@@ -53,6 +53,12 @@ describe Whatsapp::ChannelCreationService do
         expect(channel.provider_config['source']).to eq('embedded_signup')
       end
 
+      it 'persists the explicit coexistence mode from the official signup event' do
+        coexistence_service = described_class.new(account, waba_info, phone_info, access_token, onboarding_mode: 'coexistence')
+
+        expect(coexistence_service.perform.provider_config['onboarding_mode']).to eq('coexistence')
+      end
+
       it 'creates an inbox for the channel' do
         channel = service.perform
         inbox = channel.inbox

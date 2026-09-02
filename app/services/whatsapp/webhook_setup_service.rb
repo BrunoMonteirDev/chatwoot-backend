@@ -1,9 +1,10 @@
 class Whatsapp::WebhookSetupService
-  def initialize(channel, waba_id = nil, access_token = nil)
+  def initialize(channel, waba_id = nil, access_token = nil, is_coexistence: nil)
     @channel = channel
     @waba_id = waba_id || channel.provider_config['business_account_id']
     @access_token = access_token || channel.provider_config['api_key']
     @api_client = Whatsapp::FacebookApiClient.new(@access_token)
+    @is_coexistence = is_coexistence.nil? ? channel.provider_config['onboarding_mode'] == 'coexistence' : is_coexistence
   end
 
   def perform
@@ -12,7 +13,9 @@ class Whatsapp::WebhookSetupService
     # Register phone number if either condition is met:
     # 1. Phone number is not verified (code_verification_status != 'VERIFIED')
     # 2. Phone number needs registration (pending provisioning state)
-    register_phone_number if !phone_number_verified? || phone_number_needs_registration?
+    # A Business App coexistence number is already registered by Meta. Calling /register
+    # again can disrupt that onboarding; webhook subscription still proceeds normally.
+    register_phone_number if !@is_coexistence && (!phone_number_verified? || phone_number_needs_registration?)
 
     setup_webhook
   end

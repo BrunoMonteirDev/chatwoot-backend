@@ -1,9 +1,10 @@
 class Whatsapp::ChannelCreationService
-  def initialize(account, waba_info, phone_info, access_token)
+  def initialize(account, waba_info, phone_info, access_token, onboarding_mode: nil)
     @account = account
     @waba_info = waba_info
     @phone_info = phone_info
     @access_token = access_token
+    @onboarding_mode = onboarding_mode
   end
 
   def perform
@@ -53,7 +54,9 @@ class Whatsapp::ChannelCreationService
       phone_number_id: @phone_info[:phone_number_id],
       business_account_id: @waba_info[:waba_id],
       source: 'embedded_signup'
-    }
+    }.tap do |config|
+      config[:onboarding_mode] = @onboarding_mode if @onboarding_mode.present?
+    end
   end
 
   def create_inbox(channel)

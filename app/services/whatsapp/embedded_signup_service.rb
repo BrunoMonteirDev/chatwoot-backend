@@ -5,6 +5,7 @@ class Whatsapp::EmbeddedSignupService
     @business_id = params[:business_id]
     @waba_id = params[:waba_id]
     @phone_number_id = params[:phone_number_id]
+    @onboarding_mode = params[:onboarding_mode].presence
     @inbox_id = inbox_id
   end
 
@@ -43,15 +44,21 @@ class Whatsapp::EmbeddedSignupService
 
   def create_or_reauthorize_channel(access_token, phone_info)
     if @inbox_id.present?
-      Whatsapp::ReauthorizationService.new(
+      reauthorization_params = {
         account: @account,
         inbox_id: @inbox_id,
         phone_number_id: @phone_number_id,
         waba_id: @waba_id
-      ).perform(access_token, phone_info)
+      }
+      reauthorization_params[:onboarding_mode] = @onboarding_mode if @onboarding_mode.present?
+      Whatsapp::ReauthorizationService.new(**reauthorization_params).perform(access_token, phone_info)
     else
       waba_info = { waba_id: @waba_id, business_name: phone_info[:business_name] }
-      Whatsapp::ChannelCreationService.new(@account, waba_info, phone_info, access_token).perform
+      if @onboarding_mode.present?
+        Whatsapp::ChannelCreationService.new(@account, waba_info, phone_info, access_token, onboarding_mode: @onboarding_mode).perform
+      else
+        Whatsapp::ChannelCreationService.new(@account, waba_info, phone_info, access_token).perform
+      end
     end
   end
 
@@ -79,8 +86,9 @@ class Whatsapp::EmbeddedSignupService
     missing_params << 'business_id' if @business_id.blank?
     missing_params << 'waba_id' if @waba_id.blank?
 
-    return if missing_params.empty?
+    raise ArgumentError, "Required parameters are missing: #{missing_params.join(', ')}" unless missing_params.empty?
+    return if @onboarding_mode.blank? || %w[standard coexistence].include?(@onboarding_mode)
 
-    raise ArgumentError, "Required parameters are missing: #{missing_params.join(', ')}"
+    raise ArgumentError, 'Invalid onboarding mode'
   end
 end

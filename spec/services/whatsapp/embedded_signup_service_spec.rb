@@ -109,6 +109,34 @@ describe Whatsapp::EmbeddedSignupService do
         invalid_service = described_class.new(account: account, params: { code: '', business_id: '', waba_id: '' })
         expect { invalid_service.perform }.to raise_error(ArgumentError, /Required parameters are missing/)
       end
+
+      it 'rejects an onboarding mode that was not emitted by the official Meta event' do
+        invalid_service = described_class.new(account: account, params: params.merge(onboarding_mode: 'guessed'))
+
+        expect { invalid_service.perform }.to raise_error(ArgumentError, 'Invalid onboarding mode')
+      end
+    end
+
+    context 'when the official event identifies coexistence' do
+      let(:coexistence_params) { params.merge(onboarding_mode: 'coexistence') }
+      let(:coexistence_service) { described_class.new(account: account, params: coexistence_params) }
+
+      it 'passes the explicit mode to channel creation and webhook setup' do
+        token_exchange = instance_double(Whatsapp::TokenExchangeService, perform: access_token)
+        allow(Whatsapp::TokenExchangeService).to receive(:new).with(coexistence_params[:code]).and_return(token_exchange)
+
+        phone_service = instance_double(Whatsapp::PhoneInfoService, perform: phone_info)
+        allow(Whatsapp::PhoneInfoService).to receive(:new)
+          .with(coexistence_params[:waba_id], coexistence_params[:phone_number_id], access_token).and_return(phone_service)
+
+        channel_creation = instance_double(Whatsapp::ChannelCreationService, perform: channel)
+        expect(Whatsapp::ChannelCreationService).to receive(:new)
+          .with(account, { waba_id: coexistence_params[:waba_id], business_name: 'Test Business' }, phone_info, access_token, onboarding_mode: 'coexistence')
+          .and_return(channel_creation)
+
+        expect(channel).to receive(:setup_webhooks)
+        coexistence_service.perform
+      end
     end
 
     context 'when service fails' do

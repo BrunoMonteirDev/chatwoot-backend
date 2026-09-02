@@ -37,6 +37,22 @@ describe Whatsapp::WebhookSetupService do
   end
 
   describe '#perform' do
+    context 'when the channel was officially onboarded in coexistence mode' do
+      before do
+        channel.provider_config['onboarding_mode'] = 'coexistence'
+        allow(api_client).to receive(:subscribe_phone_number_webhook).and_return({ 'success' => true })
+      end
+
+      it 'does not register the pre-registered phone and still configures WABA fields and callback' do
+        expect(api_client).not_to receive(:phone_number_verified?)
+        expect(api_client).not_to receive(:register_phone_number)
+        expect(api_client).to receive(:subscribe_phone_number_webhook)
+          .with(waba_id, '123456789', anything, 'test_verify_token', subscribed_fields: %w[messages smb_message_echoes])
+
+        service.perform
+      end
+    end
+
     context 'when phone number is NOT verified (should register)' do
       before do
         allow(api_client).to receive(:phone_number_verified?).with('123456789').and_return(false)
