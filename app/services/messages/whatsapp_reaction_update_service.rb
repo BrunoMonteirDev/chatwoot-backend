@@ -1,5 +1,5 @@
 class Messages::WhatsappReactionUpdateService
-  TRANSPORTS = %w[evolution meta_cloud].freeze
+  TRANSPORTS = %w[evolution meta_cloud waha].freeze
   ORIGINS = %w[contact mobile platform].freeze
 
   def initialize(message, reaction)
