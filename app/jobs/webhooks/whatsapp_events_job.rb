@@ -47,7 +47,10 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
     # emoji is therefore the same removal operation as an empty emoji.
     return unless reaction[:message_id].present? && reaction_message[:from].present?
     target = channel.inbox.messages.find_by(source_id: reaction[:message_id])
-    return if target.blank?
+    if target.blank?
+      Rails.logger.info('[whatsapp] reaction target ignored', channel_id: channel.id, inbox_id: channel.inbox.id, target_wamid: reaction[:message_id])
+      return
+    end
 
     Messages::WhatsappReactionUpdateService.new(
       target,

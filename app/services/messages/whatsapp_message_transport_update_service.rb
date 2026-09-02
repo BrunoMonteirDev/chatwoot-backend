@@ -17,6 +17,7 @@ class Messages::WhatsappMessageTransportUpdateService
       attributes['whatsapp_transport'] = metadata['transport']
       attributes['whatsapp_remote_jid'] = metadata['remote_jid']
       attributes['whatsapp_from_me'] = ActiveModel::Type::Boolean.new.cast(metadata['from_me'])
+      attributes['whatsapp_provider_message_key'] = metadata['provider_message_key'] if metadata['provider_message_key'].present?
       message.update!(source_id: metadata['source_id'], content_attributes: attributes)
     end
     message

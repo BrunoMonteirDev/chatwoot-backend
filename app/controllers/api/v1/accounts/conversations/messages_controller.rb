@@ -121,7 +121,7 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   end
 
   def whatsapp_transport_metadata_params
-    params.permit(:source_id, :transport, :remote_jid, :from_me)
+    params.permit(:source_id, :transport, :remote_jid, :from_me, :provider_message_key)
   end
 
   def already_translated_content_available?

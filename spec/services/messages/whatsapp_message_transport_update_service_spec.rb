@@ -22,4 +22,14 @@ describe Messages::WhatsappMessageTransportUpdateService do
       'whatsapp_from_me' => true
     )
   end
+
+  it 'preserves the native WAHA message key separately from its canonical source id' do
+    described_class.new(message, {
+      source_id: 'waha:3EB01234', transport: 'waha', remote_jid: '123@lid', from_me: false,
+      provider_message_key: 'false_123@lid_3EB01234'
+    }).perform
+
+    expect(message.reload.source_id).to eq('waha:3EB01234')
+    expect(message.content_attributes['whatsapp_provider_message_key']).to eq('false_123@lid_3EB01234')
+  end
 end
