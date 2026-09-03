@@ -24,6 +24,21 @@ class Whatsapp::HistoryStateService
     @channel
   end
 
+  def reset!(subscription_available:)
+    @channel.assign_attributes(
+      meta_history_status: subscription_available ? 'available' : 'not_eligible',
+      meta_history_started_at: nil,
+      meta_history_completed_at: nil,
+      meta_history_progress: nil,
+      meta_history_error: nil,
+      meta_history_last_chunk: nil,
+      meta_history_action_available: false,
+      meta_history_subscription_available: subscription_available
+    )
+    @channel.save!(validate: false)
+    @channel
+  end
+
   private
 
   # A completion chunk may be dequeued before an earlier chunk. The earlier

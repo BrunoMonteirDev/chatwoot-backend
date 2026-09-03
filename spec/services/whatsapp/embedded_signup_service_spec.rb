@@ -26,6 +26,10 @@ describe Whatsapp::EmbeddedSignupService do
     before do
       allow(GlobalConfig).to receive(:clear_cache)
 
+      operational_state_service = instance_double(Whatsapp::OperationalStateService)
+      allow(Whatsapp::OperationalStateService).to receive(:new).and_return(operational_state_service)
+      allow(operational_state_service).to receive(:update!)
+
       # Mock service dependencies
       token_exchange = instance_double(Whatsapp::TokenExchangeService)
       allow(Whatsapp::TokenExchangeService).to receive(:new).with(params[:code]).and_return(token_exchange)
@@ -44,6 +48,7 @@ describe Whatsapp::EmbeddedSignupService do
 
       allow(channel).to receive(:setup_webhooks)
       allow(channel).to receive(:phone_number).and_return('+1234567890')
+      allow(channel).to receive(:history_eligible?).and_return(false)
 
       health_service = instance_double(Whatsapp::HealthService)
       allow(Whatsapp::HealthService).to receive(:new).and_return(health_service)
@@ -259,6 +264,89 @@ describe Whatsapp::EmbeddedSignupService do
                                                                               throughput: { 'level' => 'STANDARD' },
                                                                               messaging_limit_tier: 'TIER_1000'
                                                                             })
+        end
+      end
+
+      context 'with an existing coexistence channel' do
+        let(:inbox) { create(:inbox, account: account) }
+        let(:whatsapp_channel) do
+          create(
+            :channel_whatsapp,
+            account: account,
+            phone_number: '+1234567890',
+            provider: 'whatsapp_cloud',
+            validate_provider_config: false,
+            sync_templates: false,
+            provider_config: {
+              'api_key' => 'old-token',
+              'phone_number_id' => params[:phone_number_id],
+              'business_account_id' => params[:waba_id],
+              'source' => 'embedded_signup',
+              'onboarding_mode' => 'coexistence'
+            }
+          )
+        end
+        let(:coexistence_service) do
+          described_class.new(account: account, params: params.merge(onboarding_mode: 'coexistence'), inbox_id: inbox.id)
+        end
+
+        before do
+          inbox.update!(channel: whatsapp_channel)
+          allow(Whatsapp::ReauthorizationService).to receive(:new).and_return(reauth_service)
+          allow(reauth_service).to receive(:perform).and_return(whatsapp_channel)
+          allow(Channels::Whatsapp::HistorySyncRequestJob).to receive(:perform_later)
+        end
+
+        it 'keeps completed History untouched during normal reauthorization' do
+          whatsapp_channel.update!(meta_history_status: 'completed', meta_history_completed_at: Time.current)
+          allow(whatsapp_channel).to receive(:setup_webhooks).and_return(true)
+
+          coexistence_service.perform
+
+          expect(whatsapp_channel.reload.meta_history_status).to eq('completed')
+          expect(Channels::Whatsapp::HistorySyncRequestJob).not_to have_received(:perform_later)
+        end
+
+        it 'consumes official offboarding evidence and starts one new History lifecycle' do
+          whatsapp_channel.update!(
+            meta_connection_status: 'disconnected',
+            meta_coexistence_offboarded_at: Time.current,
+            meta_history_status: 'completed',
+            meta_history_completed_at: Time.current,
+            meta_history_subscription_available: true
+          )
+          allow(whatsapp_channel).to receive(:setup_webhooks).and_return(true)
+          expect(Whatsapp::OperationalStateService).to receive(:new).with(whatsapp_channel).and_call_original
+
+          coexistence_service.perform
+
+          expect(whatsapp_channel.reload).to have_attributes(
+            meta_connection_status: 'connected',
+            meta_coexistence_offboarded_at: nil,
+            meta_history_status: 'available'
+          )
+          expect(Channels::Whatsapp::HistorySyncRequestJob).to have_received(:perform_later).with(whatsapp_channel).once
+        end
+
+        it 'preserves evidence, History, and disconnected state when setup fails' do
+          whatsapp_channel.update!(
+            meta_connection_status: 'disconnected',
+            meta_coexistence_offboarded_at: Time.current,
+            meta_history_status: 'completed',
+            meta_history_completed_at: Time.current,
+            meta_history_subscription_available: true
+          )
+          allow(whatsapp_channel).to receive(:setup_webhooks).and_return(false)
+          expect(Whatsapp::OperationalStateService).not_to receive(:new).with(whatsapp_channel)
+
+          coexistence_service.perform
+
+          expect(whatsapp_channel.reload).to have_attributes(
+            meta_connection_status: 'disconnected',
+            meta_history_status: 'completed'
+          )
+          expect(whatsapp_channel.meta_coexistence_offboarded_at).to be_present
+          expect(Channels::Whatsapp::HistorySyncRequestJob).not_to have_received(:perform_later)
         end
       end
     end

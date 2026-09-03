@@ -20,12 +20,20 @@ class Whatsapp::EmbeddedSignupService
     # 1. Reauthorization flow updates an existing channel (not a create), so after_commit on: :create won't trigger
     # 2. We need to run check_channel_health_and_prompt_reauth after webhook setup completes
     # 3. The channel is marked with source: 'embedded_signup' to skip the after_commit callback
-    channel.setup_webhooks
-    Whatsapp::OperationalStateService.new(channel).update!(state: 'connected', checked_at: Time.current, error: nil)
+    reonboarding = coexistence_reonboarding_candidate?(channel)
+    reonboarding_succeeded =
+      if reonboarding
+        coexistence_reonboarded?(channel) { channel.setup_webhooks }
+      else
+        channel.setup_webhooks
+      end
+    Whatsapp::OperationalStateService.new(channel).update!(state: 'connected', checked_at: Time.current, error: nil) unless reonboarding && !reonboarding_succeeded
     # Meta permits the history request only during the new Coexistence
     # onboarding window. Reauthorization must not reset or replay that
     # one-shot request.
-    Channels::Whatsapp::HistorySyncRequestJob.perform_later(channel) if @inbox_id.blank? && channel.history_eligible? && channel.meta_history_subscription_available?
+    if @inbox_id.blank? && channel.history_eligible? && channel.meta_history_subscription_available?
+      Channels::Whatsapp::HistorySyncRequestJob.perform_later(channel)
+    end
     # Skip health check during reauthorization — phone numbers in pending provisioning state
     # (platform_type: NOT_APPLICABLE) would incorrectly trigger a disconnect email right after
     # a successful reauth. Only run health check for new channel creation.
@@ -95,5 +103,13 @@ class Whatsapp::EmbeddedSignupService
     return if @onboarding_mode.blank? || %w[standard coexistence].include?(@onboarding_mode)
 
     raise ArgumentError, 'Invalid onboarding mode'
+  end
+
+  def coexistence_reonboarding_candidate?(channel)
+    @inbox_id.present? && @onboarding_mode == 'coexistence' && channel.coexistence_offboarded?
+  end
+
+  def coexistence_reonboarded?(channel, &)
+    Whatsapp::CoexistenceReonboardingService.new(channel).perform(&)
   end
 end

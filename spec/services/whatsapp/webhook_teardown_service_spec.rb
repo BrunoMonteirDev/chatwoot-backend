@@ -102,6 +102,34 @@ RSpec.describe Whatsapp::WebhookTeardownService do
       end
     end
 
+    context 'when channel is a coexistence embedded signup' do
+      before do
+        allow(channel).to receive(:setup_webhooks).and_return(true)
+        channel.update!(
+          provider: 'whatsapp_cloud',
+          provider_config: {
+            'source' => 'embedded_signup',
+            'onboarding_mode' => 'coexistence',
+            'phone_number_id' => 'coexistence_phone_id',
+            'business_account_id' => 'coexistence_waba_id',
+            'api_key' => 'coexistence_api_key'
+          }
+        )
+      end
+
+      it 'does not deregister the phone number' do
+        api_client = instance_double(Whatsapp::FacebookApiClient)
+        allow(Whatsapp::FacebookApiClient).to receive(:new).with('coexistence_api_key').and_return(api_client)
+        allow(api_client).to receive(:clear_phone_number_callback_override)
+        allow(api_client).to receive(:deregister_phone_number)
+        allow(api_client).to receive(:unsubscribe_app_from_waba)
+
+        service.perform
+
+        expect(api_client).not_to have_received(:deregister_phone_number)
+      end
+    end
+
     context 'when required config is missing' do
       before do
         channel.update!(

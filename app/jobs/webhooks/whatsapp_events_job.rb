@@ -74,7 +74,10 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
     state = Whatsapp::OperationalStateService.new(channel)
     case event
     when 'ACCOUNT_OFFBOARDED', 'PARTNER_REMOVED'
-      state.update!(state: 'disconnected', event: event, error: safe_account_update_reason(params))
+      state.update!(
+        state: 'disconnected', event: event, error: safe_account_update_reason(params),
+        coexistence_offboarded: event == 'PARTNER_REMOVED' && channel.coexistence?
+      )
     when 'ACCOUNT_RECONNECTED'
       state.update!(state: 'connecting', event: event, error: nil)
       Channels::Whatsapp::ConnectionCheckJob.perform_later(channel)

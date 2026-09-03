@@ -44,6 +44,7 @@ class Channel::Whatsapp < ApplicationRecord
 
   after_create :sync_templates
   after_update_commit :log_credentials_transfer, if: :saved_change_to_provider_config?
+  before_destroy :prevent_connected_coexistence_destroy, prepend: true
   before_destroy :teardown_webhooks
   after_commit :setup_webhooks, on: :create, if: :should_auto_setup_webhooks?
 
@@ -118,6 +119,10 @@ class Channel::Whatsapp < ApplicationRecord
     coexistence?
   end
 
+  def coexistence_offboarded?
+    meta_coexistence_offboarded_at.present?
+  end
+
   # Enables voice: turns calling on at Meta (idempotent), then re-registers webhooks
   # with the in-memory calling_enabled flag so the `calls` field is subscribed. The
   # flag is persisted only after registration succeeds, so a webhook failure can't
@@ -170,12 +175,21 @@ class Channel::Whatsapp < ApplicationRecord
 
   def setup_webhooks
     perform_webhook_setup
+    true
   rescue StandardError => e
     Rails.logger.error "[WHATSAPP] Webhook setup failed: #{e.message}"
     prompt_reauthorization!
+    false
   end
 
   private
+
+  def prevent_connected_coexistence_destroy
+    return unless coexistence? && !coexistence_offboarded?
+
+    errors.add(:base, 'Coexistence channels must be offboarded in WhatsApp Business before deletion')
+    throw :abort
+  end
 
   def ensure_webhook_verify_token
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider == 'whatsapp_cloud'

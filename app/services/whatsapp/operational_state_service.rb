@@ -5,7 +5,7 @@ class Whatsapp::OperationalStateService
     @channel = channel
   end
 
-  def update!(state:, event: nil, checked_at: nil, error: nil)
+  def update!(state:, event: nil, checked_at: nil, error: nil, coexistence_offboarded: false)
     raise ArgumentError, 'Invalid WhatsApp operational state' unless STATES.include?(state)
 
     now = Time.current
@@ -18,6 +18,9 @@ class Whatsapp::OperationalStateService
     if event.present? && (@channel.meta_account_update_event != event || @channel.meta_account_update_at.blank?)
       attributes[:meta_account_update_event] = event
       attributes[:meta_account_update_at] = now
+    end
+    if coexistence_offboarded && @channel.meta_coexistence_offboarded_at.blank?
+      attributes[:meta_coexistence_offboarded_at] = now
     end
 
     return @channel if attributes.empty? || unchanged?(attributes)

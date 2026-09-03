@@ -9,7 +9,7 @@ class Whatsapp::WebhookTeardownService
     api_client = Whatsapp::FacebookApiClient.new(provider_config['api_key'])
 
     clear_phone_number_override(api_client)
-    deregister_phone_number(api_client)
+    deregister_phone_number(api_client) unless @channel.coexistence?
     unsubscribe_app_if_last_inbox(api_client)
   rescue StandardError => e
     # before_destroy must never block a channel delete — log and move on.

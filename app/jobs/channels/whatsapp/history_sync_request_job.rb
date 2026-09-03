@@ -1,5 +1,6 @@
 class Channels::Whatsapp::HistorySyncRequestJob < ApplicationJob
   queue_as :low
+  self.enqueue_after_transaction_commit = :always
 
   # This job is intentionally one-shot. A declined or expired request is a
   # normal product outcome and must never create an automatic retry loop.

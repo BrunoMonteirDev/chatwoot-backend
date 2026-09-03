@@ -280,6 +280,55 @@ RSpec.describe Channel::Whatsapp do
         expect(teardown_service).to have_received(:perform)
       end
     end
+
+    context 'when channel is a connected coexistence inbox' do
+      it 'blocks local destruction until Meta has sent official offboarding evidence' do
+        channel = create(
+          :channel_whatsapp,
+          account: account,
+          provider: 'whatsapp_cloud',
+          provider_config: {
+            'source' => 'embedded_signup',
+            'onboarding_mode' => 'coexistence',
+            'business_account_id' => 'test_waba_id',
+            'api_key' => 'test_access_token',
+            'phone_number_id' => '123456789'
+          },
+          validate_provider_config: false,
+          sync_templates: false
+        )
+
+        expect(Whatsapp::WebhookTeardownService).not_to receive(:new)
+
+        expect(channel.destroy).to be(false)
+        expect(channel.errors.full_messages).to include('Coexistence channels must be offboarded in WhatsApp Business before deletion')
+      end
+    end
+
+    context 'when channel is an officially offboarded coexistence inbox' do
+      it 'allows local teardown without bypassing the teardown service' do
+        channel = create(
+          :channel_whatsapp,
+          account: account,
+          provider: 'whatsapp_cloud',
+          provider_config: {
+            'source' => 'embedded_signup',
+            'onboarding_mode' => 'coexistence',
+            'business_account_id' => 'test_waba_id',
+            'api_key' => 'test_access_token',
+            'phone_number_id' => '123456789'
+          },
+          validate_provider_config: false,
+          sync_templates: false
+        )
+        channel.update!(meta_coexistence_offboarded_at: Time.current)
+        teardown_service = instance_double(Whatsapp::WebhookTeardownService, perform: true)
+        allow(Whatsapp::WebhookTeardownService).to receive(:new).with(channel).and_return(teardown_service)
+
+        expect(channel.destroy).to be_truthy
+        expect(teardown_service).to have_received(:perform)
+      end
+    end
   end
 
   describe '#voice_enabled?' do

@@ -20,4 +20,13 @@ describe Whatsapp::HistoryStateService do
 
     expect(channel.reload).to have_attributes(meta_history_status: 'completed', meta_history_progress: 100, meta_history_last_chunk: '2:4')
   end
+
+  it 'resets operational state for a new official cycle without changing eligibility rules' do
+    described_class.new(channel).update!(state: 'completed', progress: 100, error: 'old', chunk: '2:4')
+    described_class.new(channel.reload).reset!(subscription_available: true)
+
+    expect(channel.reload).to have_attributes(meta_history_status: 'available', meta_history_started_at: nil, meta_history_completed_at: nil,
+                                              meta_history_progress: nil, meta_history_error: nil, meta_history_last_chunk: nil,
+                                              meta_history_action_available: false, meta_history_subscription_available: true)
+  end
 end

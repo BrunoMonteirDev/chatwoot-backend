@@ -569,6 +569,38 @@ RSpec.describe Webhooks::WhatsappEventsJob do
       expect(channel.meta_account_update_event).to eq('PARTNER_REMOVED')
     end
 
+    it 'records offboarding evidence only for a coexistence channel' do
+      channel.update!(provider_config: channel.provider_config.merge('onboarding_mode' => 'coexistence'))
+
+      job.perform_now(account_update_params('PARTNER_REMOVED'))
+
+      expect(channel.reload.meta_coexistence_offboarded_at).to be_present
+    end
+
+    it 'does not record coexistence offboarding evidence for a standard Cloud channel' do
+      job.perform_now(account_update_params('PARTNER_REMOVED'))
+
+      expect(channel.reload.meta_coexistence_offboarded_at).to be_nil
+    end
+
+    it 'keeps the original offboarding evidence when PARTNER_REMOVED is delivered twice' do
+      channel.update!(provider_config: channel.provider_config.merge('onboarding_mode' => 'coexistence'))
+
+      job.perform_now(account_update_params('PARTNER_REMOVED'))
+      original_evidence = channel.reload.meta_coexistence_offboarded_at
+      job.perform_now(account_update_params('PARTNER_REMOVED'))
+
+      expect(channel.reload.meta_coexistence_offboarded_at).to eq(original_evidence)
+    end
+
+    it 'does not treat ACCOUNT_OFFBOARDED as coexistence offboarding evidence' do
+      channel.update!(provider_config: channel.provider_config.merge('onboarding_mode' => 'coexistence'))
+
+      job.perform_now(account_update_params('ACCOUNT_OFFBOARDED'))
+
+      expect(channel.reload.meta_coexistence_offboarded_at).to be_nil
+    end
+
     it 'moves ACCOUNT_RECONNECTED to connecting and queues a read-only check' do
       params = account_update_params('ACCOUNT_RECONNECTED')
 
