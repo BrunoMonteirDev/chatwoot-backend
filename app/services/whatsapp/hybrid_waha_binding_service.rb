@@ -1,0 +1,43 @@
+class Whatsapp::HybridWahaBindingService
+  class CompensationError < StandardError; end
+  def initialize(channel:, session: nil)
+    @channel, @session = channel, session
+  end
+
+  def bind!
+    raise ArgumentError, 'Only official WhatsApp channels can bind WAHA' unless channel.is_a?(Channel::Whatsapp)
+    raise ArgumentError, 'WAHA session is required' if session.blank?
+
+    reserved = true if client.binding(action: :bind, session: session)
+    channel.update!(hybrid_waha_session: session, hybrid_enabled: true)
+    channel
+  rescue StandardError => e
+    # If Rails cannot persist after a bridge reservation, compensate. The
+    # bridge unbind operation is idempotent and never stops the WAHA session.
+    return raise e unless reserved
+
+    begin
+      client.binding(action: :unbind, session: session)
+    rescue StandardError => compensation_error
+      Rails.logger.error("[HYBRID_WAHA] binding compensation failed channel_id=#{channel.id}: #{compensation_error.class}")
+      raise CompensationError, 'Hybrid WAHA binding compensation failed'
+    end
+    raise e
+  end
+
+  def unbind!
+    return channel unless channel.hybrid_waha_session.present?
+
+    client.binding(action: :unbind)
+    channel.update!(hybrid_waha_session: nil, hybrid_enabled: false)
+    channel
+  end
+
+  private
+
+  attr_reader :channel, :session
+
+  def client
+    @client ||= Whatsapp::HybridWahaBridgeClient.new(channel: channel)
+  end
+end

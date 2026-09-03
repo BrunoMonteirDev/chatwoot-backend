@@ -31,7 +31,7 @@ class Channel::Whatsapp < ApplicationRecord
   include Reauthorizable
 
   self.table_name = 'channel_whatsapp'
-  EDITABLE_ATTRS = [:phone_number, :provider, { provider_config: {} }].freeze
+  EDITABLE_ATTRS = [:phone_number, :provider, :hybrid_enabled, :hybrid_waha_session, :out_of_window_strategy, :meta_failure_strategy, { provider_config: {} }].freeze
   encrypts :business_management_token if Chatwoot.encryption_configured?
 
   # default at the moment is 360dialog lets change later.
@@ -40,6 +40,9 @@ class Channel::Whatsapp < ApplicationRecord
 
   validates :provider, inclusion: { in: PROVIDERS }
   validates :phone_number, presence: true, uniqueness: true
+  validates :out_of_window_strategy, inclusion: { in: %w[template waha] }
+  validates :meta_failure_strategy, inclusion: { in: %w[block waha] }
+  validate :validate_hybrid_waha_configuration
   validate :validate_provider_config
 
   after_create :sync_templates
@@ -114,6 +117,12 @@ class Channel::Whatsapp < ApplicationRecord
     provider == 'whatsapp_cloud' && provider_config.to_h['onboarding_mode'] == 'coexistence'
   end
 
+  # A WAHA session is complementary transport state for this official inbox.
+  # It is intentionally stored on the native channel, never in Channel::Api.
+  def hybrid_waha_enabled?
+    hybrid_enabled? && hybrid_waha_session.present?
+  end
+
   def history_eligible?
     coexistence?
   end
@@ -176,6 +185,13 @@ class Channel::Whatsapp < ApplicationRecord
   end
 
   private
+
+  def validate_hybrid_waha_configuration
+    return unless hybrid_enabled?
+
+    errors.add(:hybrid_waha_session, 'must be present when hybrid mode is enabled') if hybrid_waha_session.blank?
+    errors.add(:provider, 'must be whatsapp_cloud for hybrid WAHA') unless provider == 'whatsapp_cloud'
+  end
 
   def ensure_webhook_verify_token
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider == 'whatsapp_cloud'
