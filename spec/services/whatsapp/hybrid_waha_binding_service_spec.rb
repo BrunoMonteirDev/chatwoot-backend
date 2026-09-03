@@ -45,6 +45,7 @@ describe Whatsapp::HybridWahaBindingService do
     service.unbind!
     service.unbind!
     expect(channel.reload.hybrid_waha_session).to be_nil
+    expect(channel).to be_hybrid_enabled
     expect(client).to have_received(:binding).with(action: :unbind).once
   end
 end

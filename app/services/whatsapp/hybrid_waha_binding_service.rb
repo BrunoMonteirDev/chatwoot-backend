@@ -29,7 +29,9 @@ class Whatsapp::HybridWahaBindingService
     return channel unless channel.hybrid_waha_session.present?
 
     client.binding(action: :unbind)
-    channel.update!(hybrid_waha_session: nil, hybrid_enabled: false)
+    # Unbinding releases only the complementary WAHA transport. It must never
+    # disconnect Meta or silently change the administrator's hybrid setting.
+    channel.update!(hybrid_waha_session: nil)
     channel
   end
 

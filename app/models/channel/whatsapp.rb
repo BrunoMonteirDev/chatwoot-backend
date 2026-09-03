@@ -31,7 +31,10 @@ class Channel::Whatsapp < ApplicationRecord
   include Reauthorizable
 
   self.table_name = 'channel_whatsapp'
-  EDITABLE_ATTRS = [:phone_number, :provider, :hybrid_enabled, :hybrid_waha_session, :out_of_window_strategy, :meta_failure_strategy, { provider_config: {} }].freeze
+  # Hybrid transport is managed through the dedicated authenticated endpoints.
+  # In particular, never permit a browser to write the WAHA session identifier
+  # through the generic inbox update API.
+  EDITABLE_ATTRS = [:phone_number, :provider, { provider_config: {} }].freeze
   encrypts :business_management_token if Chatwoot.encryption_configured?
 
   # default at the moment is 360dialog lets change later.
@@ -109,7 +112,14 @@ class Channel::Whatsapp < ApplicationRecord
       'meta_history_last_chunk' => meta_history_last_chunk,
       'meta_history_action_available' => meta_history_action_available,
       'meta_history_subscription_available' => meta_history_subscription_available,
-      'meta_onboarding_mode' => provider_config.to_h['onboarding_mode']
+      'meta_onboarding_mode' => provider_config.to_h['onboarding_mode'],
+      # Hybrid transport configuration is operational metadata, not a browser
+      # credential. The session name is only an identifier; ownership is still
+      # checked by Rails and the bridge before every WAHA operation.
+      'hybrid_enabled' => hybrid_enabled?,
+      'hybrid_waha_session' => hybrid_waha_session,
+      'out_of_window_strategy' => out_of_window_strategy,
+      'meta_failure_strategy' => meta_failure_strategy
     }.compact
   end
 
@@ -189,7 +199,6 @@ class Channel::Whatsapp < ApplicationRecord
   def validate_hybrid_waha_configuration
     return unless hybrid_enabled?
 
-    errors.add(:hybrid_waha_session, 'must be present when hybrid mode is enabled') if hybrid_waha_session.blank?
     errors.add(:provider, 'must be whatsapp_cloud for hybrid WAHA') unless provider == 'whatsapp_cloud'
   end
 
