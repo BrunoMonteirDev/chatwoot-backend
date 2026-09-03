@@ -25,6 +25,18 @@ RSpec.describe Whatsapp::HybridWahaReactionInboundService do
     expect(message.reload.content_attributes['whatsapp_reactions']).to be_empty
   end
 
+  it 'reconciles a from-me WAHA echo with the existing platform reaction' do
+    message.update!(content_attributes: message.content_attributes.merge('whatsapp_reactions' => [{
+      'sender_id' => 'self', 'emoji' => '👍', 'transport' => 'waha', 'origin' => 'platform'
+    }]))
+
+    perform(from_me: true, sender_id: '554488567632@c.us', event_id: 'echo-1')
+
+    expect(message.reload.content_attributes['whatsapp_reactions']).to eq([{
+      'sender_id' => 'self', 'emoji' => '👍', 'transport' => 'waha', 'origin' => 'platform', 'event_id' => 'echo-1'
+    }])
+  end
+
   it 'ignores a missing target without creating a message' do
     expect { perform(target_message_id: 'missing') }.not_to change(Message, :count)
     expect(perform(target_message_id: 'missing')).to have_attributes(handled: true, message: nil)

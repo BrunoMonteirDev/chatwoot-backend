@@ -14,8 +14,13 @@ class Whatsapp::HybridWahaReactionInboundService
     return Result.new(handled: true) unless message
     raise ArgumentError, 'Hybrid WAHA reaction target does not belong to the chat' unless message.content_attributes.to_h['whatsapp_remote_jid'] == @payload.fetch('remote_jid')
 
+    sender_id = @payload['from_me'] ? 'self' : @payload.fetch('sender_id')
     Messages::WhatsappReactionUpdateService.new(message, {
-      sender_id: @payload.fetch('sender_id'), emoji: @payload.fetch('emoji').to_s,
+      # WAHA echoes an operation sent by the official number with its real JID.
+      # Outbound reactions are already persisted under the stable UI identity
+      # `self`, so retain that identity for the echo and let the update service
+      # converge it rather than creating a second logical actor reaction.
+      sender_id: sender_id, emoji: @payload.fetch('emoji').to_s,
       transport: 'waha', origin: @payload['from_me'] ? 'mobile' : 'contact', event_id: @payload['event_id']
     }.compact).perform
     Result.new(handled: true, message: message)
