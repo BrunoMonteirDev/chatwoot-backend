@@ -51,7 +51,7 @@ class Whatsapp::HybridRouter
     operation = attachment&.file_type || :text
     result = Whatsapp::HybridWahaBridgeClient.new(channel: channel).dispatch(
       operation: operation, conversation: conversation, message: message,
-      payload: { remote_jid: remote_jid, content: message.content, reply_to: message.content_attributes.to_h['whatsapp_provider_message_key'],
+      payload: { remote_jid: remote_jid, content: message.content, reply_to: reply_target_provider_key,
                  attachment: attachment && { url: attachment.file_url, file_name: attachment.file.filename.to_s, content_type: attachment.file.content_type } }
     )
     Messages::WhatsappMessageTransportUpdateService.new(message, {
@@ -59,6 +59,16 @@ class Whatsapp::HybridRouter
     }).perform
     log(decision)
     result
+  end
+
+  def reply_target_provider_key
+    target_id = message.content_attributes.to_h['in_reply_to']
+    return if target_id.blank?
+
+    target = conversation.messages.find_by(id: target_id)
+    raise Error, 'WAHA reply target was not found in this conversation' unless target
+
+    target.content_attributes.to_h['whatsapp_provider_message_key'].presence || raise(Error, 'WAHA reply target provider key is required')
   end
 
   def send_meta(decision)

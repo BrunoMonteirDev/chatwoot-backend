@@ -56,6 +56,12 @@ RSpec.describe Whatsapp::ReactionService do
       expect(bridge).to have_received(:dispatch).with(hash_including(operation: :reaction, payload: hash_including(target_message_id: 'false_120363@g.us_3EB0FULL'))).exactly(3).times
     end
 
+    it 'uses an outbound target key unchanged' do
+      message.update!(content_attributes: { 'whatsapp_transport' => 'waha', 'whatsapp_remote_jid' => '120363@g.us', 'whatsapp_from_me' => true, 'whatsapp_provider_message_key' => 'true_120363@g.us_3EB0FULL_5544@c.us' })
+      described_class.new(message: message, emoji: '👍', user: user).perform
+      expect(bridge).to have_received(:dispatch).with(hash_including(payload: hash_including(target_message_id: 'true_120363@g.us_3EB0FULL_5544@c.us')))
+    end
+
     it 'fails safely when the legacy WAHA provider key is absent' do
       message.update!(content_attributes: { 'whatsapp_transport' => 'waha', 'whatsapp_remote_jid' => '120363@g.us' })
       expect { described_class.new(message: message, emoji: '👍', user: user).perform }.to raise_error(described_class::Error, /provider message key/)

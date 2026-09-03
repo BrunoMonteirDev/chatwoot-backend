@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   namespace :internal do
     post 'official_whatsapp/waha/inbound', to: 'official_whatsapp_waha#inbound'
+    post 'official_whatsapp/waha/reaction', to: 'official_whatsapp_waha#reaction'
   end
   mount ActionCable.server => '/cable'
 

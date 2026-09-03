@@ -34,6 +34,43 @@ describe Whatsapp::HybridRouter do
     expect(described_class.new(channel: channel, conversation: conversation, message: message).route).to have_attributes(transport: :meta_cloud, reason: 'hybrid_disabled')
   end
 
+  describe 'WAHA replies' do
+    let(:bridge) { instance_double(Whatsapp::HybridWahaBridgeClient, dispatch: { 'source_id' => 'waha:reply', 'provider_message_key' => 'true_group_reply' }) }
+
+    before do
+      contact_inbox = conversation.contact_inbox
+      contact_inbox.update_column(:source_id, 'whatsapp:group:123@g.us')
+      allow(Whatsapp::HybridWahaBridgeClient).to receive(:new).and_return(bridge)
+    end
+
+    it 'uses the complete provider key from an inbound quoted target' do
+      target = create(:message, account: channel.account, inbox: channel.inbox, conversation: conversation, source_id: 'waha:inbound', content_attributes: { 'whatsapp_provider_message_key' => 'false_123@g.us_inbound_5511@c.us' })
+      message.update!(content_attributes: { 'in_reply_to' => target.id })
+      described_class.new(channel: channel, conversation: conversation, message: message).dispatch
+      expect(bridge).to have_received(:dispatch).with(hash_including(payload: hash_including(reply_to: 'false_123@g.us_inbound_5511@c.us')))
+    end
+
+    it 'uses the complete provider key from an outbound quoted target' do
+      target = create(:message, account: channel.account, inbox: channel.inbox, conversation: conversation, source_id: 'waha:outbound', content_attributes: { 'whatsapp_provider_message_key' => 'true_123@g.us_outbound_5544@c.us' })
+      message.update!(content_attributes: { 'in_reply_to' => target.id })
+      described_class.new(channel: channel, conversation: conversation, message: message).dispatch
+      expect(bridge).to have_received(:dispatch).with(hash_including(payload: hash_including(reply_to: 'true_123@g.us_outbound_5544@c.us')))
+    end
+
+    it 'fails safely when the quoted target has no provider key' do
+      target = create(:message, account: channel.account, inbox: channel.inbox, conversation: conversation)
+      message.update!(content_attributes: { 'in_reply_to' => target.id })
+      expect { described_class.new(channel: channel, conversation: conversation, message: message).dispatch }
+        .to raise_error(Whatsapp::HybridRouter::Error, /provider key/)
+      expect(bridge).not_to have_received(:dispatch)
+    end
+
+    it 'preserves a normal WAHA message without a reply target' do
+      described_class.new(channel: channel, conversation: conversation, message: message).dispatch
+      expect(bridge).to have_received(:dispatch).with(hash_including(payload: hash_including(reply_to: nil)))
+    end
+  end
+
   context 'when Meta is attempted in hybrid mode' do
     let(:sender) { instance_double(Whatsapp::Providers::WhatsappCloudStructuredSender) }
     let(:bridge) { instance_double(Whatsapp::HybridWahaBridgeClient) }
