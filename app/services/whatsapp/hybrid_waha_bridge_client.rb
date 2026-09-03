@@ -54,5 +54,17 @@ class Whatsapp::HybridWahaBridgeClient
     JSON.parse(response.body)
   end
 
-  public :binding
+  def session(action:, session: nil)
+    body = { account_id: channel.account_id, inbox_id: inbox.id, channel_id: channel.id, waha_session: session }.compact.to_json
+    uri = URI.join(bridge_url, "/internal/official-whatsapp/waha/session/#{action}")
+    request = Net::HTTP::Post.new(uri, { 'Content-Type' => 'application/json' }.merge(Whatsapp::HybridWahaBridgeSigner.headers(method: 'POST', path: uri.path, body: body)))
+    request.body = body
+    response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 5, read_timeout: 20) { |http| http.request(request) }
+    return {} if response.is_a?(Net::HTTPNoContent)
+    raise Error, "Hybrid WAHA bridge rejected session (#{response.code})" unless response.is_a?(Net::HTTPSuccess)
+
+    JSON.parse(response.body)
+  end
+
+  public :binding, :session
 end

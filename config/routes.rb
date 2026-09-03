@@ -303,6 +303,7 @@ Rails.application.routes.draw do
           resource :branded_email_layout, only: [:show, :update]
           resources :inboxes, only: [:index, :show, :create, :update, :destroy] do
             resource :hybrid_waha_binding, only: [:show, :create, :destroy], module: :inboxes
+            resources :hybrid_waha_sessions, only: [:index, :create, :show, :update, :destroy], module: :inboxes
             resource :hybrid_waha_configuration, only: [:show, :update], module: :inboxes
             get :assignable_agents, on: :member
             get :campaigns, on: :member

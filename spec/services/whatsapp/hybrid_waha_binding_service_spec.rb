@@ -7,6 +7,7 @@ describe Whatsapp::HybridWahaBindingService do
   before do
     allow_any_instance_of(Channel::Whatsapp).to receive(:validate_provider_config)
     allow(Whatsapp::HybridWahaBridgeClient).to receive(:new).and_return(client)
+    allow(client).to receive(:session).with(action: :status, session: 's1').and_return('session' => { 'connectionStatus' => 'connected', 'me' => { 'id' => channel.phone_number } })
   end
 
   it 'persists only after the bridge reserves the session and is idempotent' do

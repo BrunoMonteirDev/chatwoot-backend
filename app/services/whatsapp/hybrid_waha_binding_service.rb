@@ -8,6 +8,10 @@ class Whatsapp::HybridWahaBindingService
     raise ArgumentError, 'Only official WhatsApp channels can bind WAHA' unless channel.is_a?(Channel::Whatsapp)
     raise ArgumentError, 'WAHA session is required' if session.blank?
 
+    details = client.session(action: :status, session: session).fetch('session')
+    raise ArgumentError, 'A sessão WAHA ainda não está conectada.' unless details['connectionStatus'] == 'connected'
+    raise ArgumentError, 'A sessão WAHA conectada pertence a outro número. Conecte o mesmo WhatsApp utilizado nesta Inbox oficial.' unless same_phone?(details.dig('me', 'id'))
+
     reserved = true if client.binding(action: :bind, session: session)
     channel.update!(hybrid_waha_session: session, hybrid_enabled: true)
     channel
@@ -41,5 +45,13 @@ class Whatsapp::HybridWahaBindingService
 
   def client
     @client ||= Whatsapp::HybridWahaBridgeClient.new(channel: channel)
+  end
+
+  def same_phone?(jid)
+    normalize(jid) == normalize(channel.phone_number)
+  end
+
+  def normalize(value)
+    value.to_s.sub(/@(c\.us|s\.whatsapp\.net)\z/i, '').gsub(/\D/, '')
   end
 end
