@@ -40,4 +40,26 @@ RSpec.describe Whatsapp::ReactionService do
     message.update!(source_id: 'wamid.target', content_attributes: { 'whatsapp_remote_jid' => '120363@g.us' })
     expect { described_class.new(message: message, emoji: '👍', user: user).perform }.to raise_error(described_class::Error, /groups/)
   end
+
+  context 'with a hybrid WAHA message' do
+    let(:bridge) { instance_double(Whatsapp::HybridWahaBridgeClient, dispatch: { 'ok' => true }) }
+
+    before do
+      channel.update_columns(hybrid_enabled: true, hybrid_waha_session: 'session-a')
+      message.update!(source_id: 'waha:canonical', content_attributes: { 'whatsapp_transport' => 'waha', 'whatsapp_remote_jid' => '120363@g.us', 'whatsapp_provider_message_key' => 'false_120363@g.us_3EB0FULL' })
+      allow(Whatsapp::HybridWahaBridgeClient).to receive(:new).with(channel: channel).and_return(bridge)
+    end
+
+    it 'uses the complete WAHA provider key for add, replace and remove' do
+      %w[👍 ❤️].each { |emoji| described_class.new(message: message, emoji: emoji, user: user).perform }
+      described_class.new(message: message, emoji: '', user: user).perform
+      expect(bridge).to have_received(:dispatch).with(hash_including(operation: :reaction, payload: hash_including(target_message_id: 'false_120363@g.us_3EB0FULL'))).exactly(3).times
+    end
+
+    it 'fails safely when the legacy WAHA provider key is absent' do
+      message.update!(content_attributes: { 'whatsapp_transport' => 'waha', 'whatsapp_remote_jid' => '120363@g.us' })
+      expect { described_class.new(message: message, emoji: '👍', user: user).perform }.to raise_error(described_class::Error, /provider message key/)
+      expect(bridge).not_to have_received(:dispatch)
+    end
+  end
 end

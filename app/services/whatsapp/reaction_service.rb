@@ -8,6 +8,8 @@ class Whatsapp::ReactionService
   end
 
   def perform
+    return perform_waha if waha_message?
+
     validate!
     channel.provider_service.send_reaction(contact_source_id, message.source_id, emoji)
     Messages::WhatsappReactionUpdateService.new(message, sender_reaction).perform
@@ -32,6 +34,24 @@ class Whatsapp::ReactionService
     raise Error, 'A reaction requires a WhatsApp message id' unless message.source_id.to_s.start_with?('wamid.')
     raise Error, 'WhatsApp Cloud reactions are not available for groups' if message.content_attributes.to_h['whatsapp_remote_jid'].to_s.end_with?('@g.us')
     raise Error, 'Invalid reaction emoji' unless emoji.length <= 64
+  end
+
+  def waha_message?
+    message.content_attributes.to_h['whatsapp_transport'] == 'waha'
+  end
+
+  def perform_waha
+    key = message.content_attributes.to_h['whatsapp_provider_message_key'].presence || raise(Error, 'WAHA provider message key is required')
+    remote_jid = message.content_attributes.to_h['whatsapp_remote_jid'].presence || raise(Error, 'WAHA remote JID is required')
+    raise Error, 'Hybrid WAHA is not enabled for this inbox' unless channel.respond_to?(:hybrid_waha_enabled?) && channel.hybrid_waha_enabled?
+
+    Whatsapp::HybridWahaBridgeClient.new(channel: channel).dispatch(
+      operation: :reaction, conversation: message.conversation, message: message,
+      payload: { remote_jid: remote_jid, target_message_id: key, emoji: emoji }
+    )
+    Messages::WhatsappReactionUpdateService.new(message, { sender_id: 'self', emoji: emoji, transport: 'waha', origin: 'platform' }).perform
+  rescue Whatsapp::HybridWahaBridgeClient::Error => e
+    raise Error, e.message
   end
 
   def sender_reaction

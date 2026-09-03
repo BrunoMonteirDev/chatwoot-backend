@@ -6,6 +6,12 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
   end
 
   def perform_reply
+    return Whatsapp::HybridRouter.new(channel: channel, conversation: message.conversation, message: message).dispatch { perform_meta_reply } if channel.hybrid_waha_enabled? && template_params.blank?
+
+    perform_meta_reply
+  end
+
+  def perform_meta_reply
     return send_template_message if template_params.present?
     return send_session_message if message.conversation.can_reply?
 
