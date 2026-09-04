@@ -1,5 +1,6 @@
 <script>
 import { mapGetters } from 'vuex';
+import { ref } from 'vue';
 import LoadingState from './components/widgets/LoadingState.vue';
 import NetworkNotification from './components/NetworkNotification.vue';
 import UpdateBanner from './components/app/UpdateBanner.vue';
@@ -21,6 +22,7 @@ import {
 } from './helper/pushHelper';
 import ReconnectService from 'dashboard/helper/ReconnectService';
 import { useUISettings } from 'dashboard/composables/useUISettings';
+import { useViewportHeight } from 'dashboard/composables/useViewportHeight';
 
 export default {
   name: 'App',
@@ -42,6 +44,8 @@ export default {
     // Use the font size composable (it automatically sets up the watcher)
     const { currentFontSize } = useFontSize();
     const { uiSettings } = useUISettings();
+    const appRoot = ref(null);
+    useViewportHeight(appRoot);
 
     return {
       router,
@@ -49,6 +53,7 @@ export default {
       currentAccountId: accountId,
       currentFontSize,
       uiSettings,
+      appRoot,
     };
   },
   data() {
@@ -137,7 +142,8 @@ export default {
   <div
     v-if="!authUIFlags.isFetching"
     id="app"
-    class="flex flex-col w-full h-screen min-h-0 bg-n-background"
+    ref="appRoot"
+    class="flex flex-col w-full h-screen h-[var(--app-viewport-height,100dvh)] min-h-0 overflow-hidden bg-n-background"
     :dir="isRTL ? 'rtl' : 'ltr'"
   >
     <UpdateBanner :latest-chatwoot-version="latestChatwootVersion" />

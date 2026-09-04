@@ -459,7 +459,7 @@ export default {
 <template>
   <div
     ref="messagesViewRef"
-    class="flex flex-col justify-between flex-grow h-full min-w-0 m-0"
+    class="flex flex-1 flex-col justify-between min-h-0 min-w-0 m-0 overflow-hidden"
   >
     <div ref="topBannerRef">
       <Banner
@@ -487,7 +487,7 @@ export default {
     </div>
     <MessageList
       ref="conversationPanelRef"
-      class="conversation-panel flex-shrink flex-grow basis-px flex flex-col overflow-y-auto relative h-full m-0 pb-4"
+      class="conversation-panel flex-shrink flex-grow basis-px flex flex-col min-h-0 overflow-y-auto overscroll-contain relative m-0 pb-4"
       :current-user-id="currentUserId"
       :first-unread-id="unReadMessages[0]?.id"
       :is-an-email-channel="isAnEmailChannel"
@@ -526,7 +526,9 @@ export default {
         />
       </template>
     </MessageList>
-    <div class="flex relative flex-col bg-n-surface-1">
+    <div
+      class="flex relative flex-none flex-col bg-n-surface-1 pb-[env(safe-area-inset-bottom)]"
+    >
       <div
         v-if="isAnyoneTyping"
         class="absolute flex items-center w-full h-0 -top-7"
