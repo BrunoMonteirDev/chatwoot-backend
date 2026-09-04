@@ -15,8 +15,9 @@ RSpec.describe 'DashboardAppsController', type: :request do
     context 'when it is an authenticated user' do
       let(:user) { create(:user, account: account) }
       let!(:dashboard_app) { create(:dashboard_app, user: user, account: account) }
+      let!(:disabled_dashboard_app) { create(:dashboard_app, user: user, account: account, enabled: false) }
 
-      it 'returns all dashboard_apps in the account' do
+      it 'returns only enabled dashboard apps in the current account' do
         get "/api/v1/accounts/#{account.id}/dashboard_apps",
             headers: user.create_new_auth_token,
             as: :json
@@ -25,6 +26,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
         response_body = response.parsed_body
         expect(response_body.first['title']).to eq(dashboard_app.title)
         expect(response_body.first['content']).to eq(dashboard_app.content)
+        expect(response_body.map { |app| app['id'] }).not_to include(disabled_dashboard_app.id)
       end
     end
   end
@@ -49,6 +51,13 @@ RSpec.describe 'DashboardAppsController', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(response.body).to include(dashboard_app.title)
+      end
+
+      it 'does not expose a disabled app by direct URL' do
+        dashboard_app.update!(enabled: false)
+        get "/api/v1/accounts/#{account.id}/dashboard_apps/#{dashboard_app.id}", headers: user.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:not_found)
       end
     end
   end
@@ -86,17 +95,13 @@ RSpec.describe 'DashboardAppsController', type: :request do
         expect(json_response['content'][0]['type']).to eq payload[:dashboard_app][:content][0][:type]
       end
 
-      it 'creates the dashboard app even if the URL does not have SSL' do
+      it 'rejects remote dashboard apps without TLS' do
         expect do
           post "/api/v1/accounts/#{account.id}/dashboard_apps", headers: user.create_new_auth_token,
                                                                 params: no_ssl_payload
-        end.to change(DashboardApp, :count).by(1)
+        end.not_to change(DashboardApp, :count)
 
-        expect(response).to have_http_status(:success)
-        json_response = response.parsed_body
-        expect(json_response['title']).to eq 'CRM Dashboard'
-        expect(json_response['content'][0]['link']).to eq payload[:dashboard_app][:content][0][:link]
-        expect(json_response['content'][0]['type']).to eq payload[:dashboard_app][:content][0][:type]
+        expect(response).to have_http_status(:unprocessable_entity)
       end
 
       it 'does not create the dashboard app if invalid URL' do
@@ -107,7 +112,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
 
         expect(response).to have_http_status(:unprocessable_entity)
         json_response = response.parsed_body
-        expect(json_response['message']).to eq 'Content : Invalid data'
+        expect(json_response['message']).to include('Content : Invalid data')
       end
 
       it 'does not create the dashboard app if non HTTP URL' do
@@ -118,7 +123,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
 
         expect(response).to have_http_status(:unprocessable_entity)
         json_response = response.parsed_body
-        expect(json_response['message']).to eq 'Content : Invalid data'
+        expect(json_response['message']).to include('Content : Invalid data')
       end
 
       it 'does not create the dashboard app if invalid type' do
@@ -142,7 +147,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
                as: :json
         end.not_to change(DashboardApp, :count)
 
-        expect(response).to have_http_status(:unauthorized)
+        expect(response).to have_http_status(:forbidden)
       end
     end
   end
@@ -185,7 +190,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
               params: payload,
               as: :json
 
-        expect(response).to have_http_status(:unauthorized)
+        expect(response).to have_http_status(:forbidden)
         expect(dashboard_app.reload.title).not_to eq('CRM Dashboard')
       end
     end
@@ -220,7 +225,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
                headers: agent.create_new_auth_token,
                as: :json
 
-        expect(response).to have_http_status(:unauthorized)
+        expect(response).to have_http_status(:forbidden)
         expect(DashboardApp.exists?(dashboard_app.id)).to be(true)
       end
     end
