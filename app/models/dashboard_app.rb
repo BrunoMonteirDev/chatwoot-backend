@@ -55,9 +55,13 @@ class DashboardApp < ApplicationRecord
       next false unless item.is_a?(Hash)
 
       uri = URI.parse(item['url'].to_s)
-      uri.is_a?(URI::HTTPS) || (uri.is_a?(URI::HTTP) && LOCAL_FRAME_HOSTS.include?(uri.hostname.to_s.delete_prefix('[').delete_suffix(']')))
+      uri.is_a?(URI::HTTPS) || (local_environment? && uri.is_a?(URI::HTTP) && LOCAL_FRAME_HOSTS.include?(uri.hostname.to_s.delete_prefix('[').delete_suffix(']')))
     rescue URI::InvalidURIError
       false
     end
+  end
+
+  def local_environment?
+    Rails.env.development? || Rails.env.test?
   end
 end

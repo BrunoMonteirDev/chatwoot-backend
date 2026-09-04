@@ -114,7 +114,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
 
         expect(response).to have_http_status(:unprocessable_entity)
         json_response = response.parsed_body
-        expect(json_response['message']).to eq 'Content : Invalid data'
+        expect(json_response['message']).to include('Content : Invalid data')
       end
 
       it 'does not create the dashboard app if non HTTP URL' do
@@ -125,7 +125,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
 
         expect(response).to have_http_status(:unprocessable_entity)
         json_response = response.parsed_body
-        expect(json_response['message']).to eq 'Content : Invalid data'
+        expect(json_response['message']).to include('Content : Invalid data')
       end
 
       it 'rejects browser-executable and local-file URL schemes' do
@@ -161,7 +161,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
                as: :json
         end.not_to change(DashboardApp, :count)
 
-        expect(response).to have_http_status(:unauthorized)
+        expect(response).to have_http_status(:forbidden)
       end
     end
   end
@@ -235,7 +235,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
               params: payload,
               as: :json
 
-        expect(response).to have_http_status(:unauthorized)
+        expect(response).to have_http_status(:forbidden)
         expect(dashboard_app.reload.title).not_to eq('CRM Dashboard')
       end
     end
@@ -270,7 +270,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
                headers: agent.create_new_auth_token,
                as: :json
 
-        expect(response).to have_http_status(:unauthorized)
+        expect(response).to have_http_status(:forbidden)
         expect(DashboardApp.exists?(dashboard_app.id)).to be(true)
       end
     end

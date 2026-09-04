@@ -8,6 +8,7 @@ RSpec.describe Whatsapp::SendCapabilityService do
   before do
     allow(conversation).to receive(:inbox).and_return(inbox)
     allow(inbox).to receive(:channel).and_return(channel)
+    allow(channel).to receive(:is_a?).with(Channel::Whatsapp).and_return(true)
   end
 
   it 'keeps a Meta conversation editable when router selects Meta' do
