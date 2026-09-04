@@ -86,6 +86,17 @@ RSpec.describe 'Search', type: :request do
         expect(contact_result).not_to have_key(:created_at)
       end
 
+      it 'finds a normalized Brazilian phone number from formatted input' do
+        contact = create(:contact, account: account, phone_number: '+551198765432')
+
+        get "/api/v1/accounts/#{account.id}/search/contacts",
+            headers: agent.create_new_auth_token,
+            params: { q: '+55 (11) 99876-5432' },
+            as: :json
+
+        expect(response.parsed_body['payload']['contacts'].pluck('id')).to include(contact.id)
+      end
+
       context 'with advanced_search feature enabled', :opensearch do
         before do
           account.enable_features!('advanced_search')

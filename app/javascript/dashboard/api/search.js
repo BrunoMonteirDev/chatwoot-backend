@@ -14,7 +14,7 @@ class SearchAPI extends ApiClient {
     });
   }
 
-  contacts({ q, page = 1, since, until }) {
+  contacts({ q, page = 1, since, until, signal }) {
     return axios.get(`${this.url}/contacts`, {
       params: {
         q,
@@ -22,10 +22,11 @@ class SearchAPI extends ApiClient {
         since,
         until,
       },
+      signal,
     });
   }
 
-  conversations({ q, page = 1, since, until }) {
+  conversations({ q, page = 1, since, until, signal }) {
     return axios.get(`${this.url}/conversations`, {
       params: {
         q,
@@ -33,6 +34,7 @@ class SearchAPI extends ApiClient {
         since,
         until,
       },
+      signal,
     });
   }
 

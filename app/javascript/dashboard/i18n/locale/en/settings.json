@@ -308,6 +308,14 @@
     }
   },
   "SIDEBAR": {
+    "SEARCH": "Search",
+    "SEARCH_PLACEHOLDER": "Search contacts and conversations...",
+    "SEARCH_MINIMUM": "Type at least 2 characters to search.",
+    "SEARCH_LOADING": "Searching...",
+    "SEARCH_EMPTY": "No results found.",
+    "SEARCH_ERROR": "Search failed. Please try again.",
+    "SEARCH_CONVERSATIONS": "Conversations",
+    "SEARCH_CONTACTS": "Contacts",
     "NO_ITEMS": "No items",
     "CURRENTLY_VIEWING_ACCOUNT": "Currently viewing:",
     "SWITCH": "Switch",

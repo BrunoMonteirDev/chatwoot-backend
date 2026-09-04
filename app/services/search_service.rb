@@ -162,16 +162,24 @@ class SearchService
   end
 
   def filter_contacts
-    contacts_query = current_account.contacts.where(
-      "name ILIKE :search OR email ILIKE :search OR phone_number
-      ILIKE :search OR identifier ILIKE :search", search: "%#{search_query}%"
-    )
+    contacts_query = current_account.contacts.where(contact_search_conditions, contact_search_params)
 
     contacts_query = apply_time_filter(contacts_query, 'last_activity_at') if current_account.feature_enabled?('advanced_search')
 
     @contacts = contacts_query.resolved_contacts(
       use_crm_v2: current_account.feature_enabled?('crm_v2')
     ).order_on_last_activity_at('desc').page(params[:page]).per(15)
+  end
+
+  def contact_search_conditions
+    'name ILIKE :search OR email ILIKE :search OR phone_number ILIKE :search OR identifier ILIKE :search OR ' \
+      "regexp_replace(phone_number, '[^0-9]', '', 'g') ILIKE :normalized_phone"
+  end
+
+  def contact_search_params
+    normalized_phone = "+#{search_query.gsub(/\D/, '')}"
+    canonical_phone = Contact.normalize_brazilian_phone_number(normalized_phone).delete_prefix('+')
+    { search: "%#{search_query}%", normalized_phone: "%#{canonical_phone}%" }
   end
 
   def filter_articles
