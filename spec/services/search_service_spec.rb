@@ -75,6 +75,13 @@ describe SearchService do
         search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Contact')
         expect(search.perform[:contacts].map(&:id)).to eq([harry4.id, harry3.id, harry2.id, harry.id])
       end
+
+      it 'matches formatted Brazilian phone input against its normalized stored value' do
+        contact = create(:contact, account_id: account.id, name: 'Telefone', phone_number: '+5544999990000')
+        search = described_class.new(current_user: user, current_account: account, params: { q: '+55 (44) 99999-0000' }, search_type: 'Contact')
+
+        expect(search.perform[:contacts].map(&:id)).to include(contact.id)
+      end
     end
 
     context 'when message search' do
