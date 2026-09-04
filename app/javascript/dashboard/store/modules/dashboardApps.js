@@ -4,6 +4,7 @@ import DashboardAppsAPI from '../../api/dashboardApps';
 
 export const state = {
   records: [],
+  accountId: null,
   uiFlags: {
     isFetching: false,
     isCreating: false,
@@ -21,11 +22,20 @@ export const getters = {
 };
 
 export const actions = {
-  get: async function getDashboardApps({ commit }) {
+  get: async function getDashboardApps(
+    { commit, state: moduleState, rootGetters },
+    { force = false } = {}
+  ) {
+    const accountId = rootGetters.getCurrentAccountId;
+    if (!accountId || (!force && moduleState.accountId === accountId)) return;
+
+    commit(types.CLEAR_DASHBOARD_APPS);
     commit(types.SET_DASHBOARD_APPS_UI_FLAG, { isFetching: true });
     try {
       const response = await DashboardAppsAPI.get();
-      commit(types.SET_DASHBOARD_APPS, response.data);
+      if (rootGetters.getCurrentAccountId === accountId) {
+        commit(types.SET_DASHBOARD_APPS, { accountId, records: response.data });
+      }
     } catch (error) {
       // Ignore error
     } finally {
@@ -76,7 +86,14 @@ export const mutations = {
     };
   },
 
-  [types.SET_DASHBOARD_APPS]: MutationHelpers.set,
+  [types.SET_DASHBOARD_APPS](_state, { accountId, records }) {
+    _state.records = records;
+    _state.accountId = accountId;
+  },
+  [types.CLEAR_DASHBOARD_APPS](_state) {
+    _state.records = [];
+    _state.accountId = null;
+  },
   [types.CREATE_DASHBOARD_APP]: MutationHelpers.create,
   [types.EDIT_DASHBOARD_APP]: MutationHelpers.update,
   [types.DELETE_DASHBOARD_APP]: MutationHelpers.destroy,

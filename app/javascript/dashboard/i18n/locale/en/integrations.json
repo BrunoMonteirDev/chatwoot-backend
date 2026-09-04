@@ -247,6 +247,7 @@
       "DESCRIPTION": "Dashboard Apps allow organizations to embed an application inside the dashboard to provide the context for customer support agents. This feature allows you to create an application independently and embed that to provide user information, their orders, or their previous payment history.",
       "LEARN_MORE": "Learn more about Dashboard Apps",
       "COUNT": "{n} dashboard app | {n} dashboard apps",
+      "UNAVAILABLE": "This app is unavailable.",
       "SEARCH_PLACEHOLDER": "Search dashboard apps...",
       "NO_RESULTS": "No dashboard apps found matching your search",
       "LIST": {

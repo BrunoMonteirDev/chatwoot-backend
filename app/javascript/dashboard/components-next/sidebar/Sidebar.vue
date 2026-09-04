@@ -28,6 +28,7 @@ import {
   resolveSidebarSort,
   sortSidebarItems,
 } from 'dashboard/helper/sidebarSort';
+import { dashboardAppSidebarChildren } from 'dashboard/helper/dashboardApps';
 
 const props = defineProps({
   isMobileSidebarOpen: {
@@ -212,6 +213,7 @@ useEventListener(document, 'touchend', onResizeEnd);
 
 const inboxes = useMapGetter('inboxes/getInboxes');
 const labels = useMapGetter('labels/getLabelsOnSidebar');
+const dashboardApps = useMapGetter('dashboardApps/getRecords');
 const allUnreadCount = useMapGetter(
   'conversationUnreadCounts/getAllUnreadCount'
 );
@@ -260,6 +262,10 @@ watch([accountId, hasConversationUnreadCounts], fetchConversationUnreadCounts, {
 });
 
 watch([accountId, currentUserId], fetchSidebarSortPreferences, {
+  immediate: true,
+});
+
+watch(accountId, () => store.dispatch('dashboardApps/get'), {
   immediate: true,
 });
 
@@ -491,6 +497,16 @@ const menuItems = computed(() => {
           })),
         },
       ],
+    },
+    {
+      name: 'Apps',
+      label: t('SIDEBAR.APPS'),
+      icon: 'i-lucide-panels-top-left',
+      children: dashboardAppSidebarChildren(
+        dashboardApps.value,
+        accountId.value,
+        accountScopedRoute
+      ),
     },
     {
       name: 'Captain',

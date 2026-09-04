@@ -13,9 +13,22 @@ describe('#mutations', () => {
 
   describe('#SET_DASHBOARD_APPS', () => {
     it('set dashboard records', () => {
-      const state = { records: [{ title: 'Title 0' }] };
-      mutations[types.SET_DASHBOARD_APPS](state, [{ title: 'Title 1' }]);
+      const state = { records: [{ title: 'Title 0' }], accountId: null };
+      mutations[types.SET_DASHBOARD_APPS](state, {
+        accountId: 2,
+        records: [{ title: 'Title 1' }],
+      });
       expect(state.records).toEqual([{ title: 'Title 1' }]);
+      expect(state.accountId).toBe(2);
+    });
+  });
+
+  describe('#CLEAR_DASHBOARD_APPS', () => {
+    it('clears records before loading another account', () => {
+      const state = { records: [{ title: 'Account one' }], accountId: 1 };
+      mutations[types.CLEAR_DASHBOARD_APPS](state);
+
+      expect(state).toEqual({ records: [], accountId: null });
     });
   });
 

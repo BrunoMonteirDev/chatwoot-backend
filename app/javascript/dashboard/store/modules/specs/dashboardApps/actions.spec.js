@@ -3,6 +3,8 @@ import { actions } from '../../dashboardApps';
 import types from '../../../mutation-types';
 import { payload, automationsList } from './fixtures';
 const commit = vi.fn();
+const rootGetters = { getCurrentAccountId: 1 };
+const moduleState = { accountId: null };
 global.axios = axios;
 vi.mock('axios');
 
@@ -10,12 +12,26 @@ describe('#actions', () => {
   describe('#get', () => {
     it('sends correct actions if API is success', async () => {
       axios.get.mockResolvedValue({ data: [{ title: 'Title 1' }] });
-      await actions.get({ commit });
+      await actions.get({ commit, rootGetters, state: moduleState });
       expect(commit.mock.calls).toEqual([
+        [types.CLEAR_DASHBOARD_APPS],
         [types.SET_DASHBOARD_APPS_UI_FLAG, { isFetching: true }],
-        [types.SET_DASHBOARD_APPS, [{ title: 'Title 1' }]],
+        [
+          types.SET_DASHBOARD_APPS,
+          { accountId: 1, records: [{ title: 'Title 1' }] },
+        ],
         [types.SET_DASHBOARD_APPS_UI_FLAG, { isFetching: false }],
       ]);
+    });
+
+    it('uses the current-account cache', async () => {
+      await actions.get({
+        commit,
+        rootGetters,
+        state: { accountId: 1 },
+      });
+
+      expect(commit).not.toHaveBeenCalled();
     });
   });
 

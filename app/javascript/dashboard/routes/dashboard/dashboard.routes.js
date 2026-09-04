@@ -15,6 +15,7 @@ import Suspended from './suspended/Index.vue';
 import NoAccounts from './noAccounts/Index.vue';
 import OnboardingAccountDetails from './onboarding/Index.vue';
 import OnboardingInboxSetup from './onboarding/InboxSetup.vue';
+import DashboardAppLauncher from './apps/Index.vue';
 
 export default {
   routes: [
@@ -33,6 +34,11 @@ export default {
         ...notificationRoutes,
         ...helpcenterRoutes.routes,
         ...campaignsRoutes.routes,
+        {
+          path: 'apps/:appId',
+          name: 'dashboard_apps_launcher',
+          component: DashboardAppLauncher,
+        },
       ],
     },
     {

@@ -32,7 +32,9 @@ class Api::V1::Accounts::DashboardAppsController < Api::V1::Accounts::BaseContro
   end
 
   def fetch_dashboard_app
-    @dashboard_app = @dashboard_apps.find(permitted_params[:id])
+    dashboard_apps = @dashboard_apps
+    dashboard_apps = dashboard_apps.where(enabled: true) if action_name == 'show'
+    @dashboard_app = dashboard_apps.find(permitted_params[:id])
   end
 
   def permitted_payload

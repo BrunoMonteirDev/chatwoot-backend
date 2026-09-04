@@ -42,6 +42,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
         expect(response.parsed_body.pluck('id')).to contain_exactly(enabled_dashboard_app.id)
       end
     end
+
   end
 
   describe 'GET /api/v1/accounts/{account.id}/dashboard_apps/:id' do
@@ -64,6 +65,36 @@ RSpec.describe 'DashboardAppsController', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(response.body).to include(dashboard_app.title)
+      end
+    end
+
+    context 'when the app is disabled' do
+      let!(:dashboard_app) do
+        create(:dashboard_app, user: user, account: account, enabled: false)
+      end
+
+      it 'does not expose the app' do
+        get "/api/v1/accounts/#{account.id}/dashboard_apps/#{dashboard_app.id}",
+            headers: user.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    context 'when the app belongs to another account' do
+      let(:other_account) { create(:account) }
+      let(:other_user) { create(:user, account: other_account) }
+      let!(:dashboard_app) do
+        create(:dashboard_app, user: other_user, account: other_account)
+      end
+
+      it 'does not expose the app' do
+        get "/api/v1/accounts/#{account.id}/dashboard_apps/#{dashboard_app.id}",
+            headers: user.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:not_found)
       end
     end
   end

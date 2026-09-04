@@ -53,6 +53,7 @@ export default {
     },
   },
   mounted() {
+    this.hasOpenedAtleastOnce = this.isVisible;
     window.addEventListener('message', this.triggerEvent);
   },
   unmounted() {
