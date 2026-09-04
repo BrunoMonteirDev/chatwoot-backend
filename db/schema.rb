@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_28_130000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_04_132000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -960,6 +960,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_28_130000) do
     t.jsonb "content", default: []
     t.bigint "account_id", null: false
     t.bigint "user_id"
+    t.boolean "enabled", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_dashboard_apps_on_account_id"

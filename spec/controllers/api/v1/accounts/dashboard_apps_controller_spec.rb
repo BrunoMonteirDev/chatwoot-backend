@@ -27,6 +27,21 @@ RSpec.describe 'DashboardAppsController', type: :request do
         expect(response_body.first['content']).to eq(dashboard_app.content)
       end
     end
+
+    context 'when it is an authenticated agent' do
+      let(:user) { create(:user, account: account, role: :agent) }
+      let!(:enabled_dashboard_app) { create(:dashboard_app, user: user, account: account, enabled: true) }
+      let!(:disabled_dashboard_app) { create(:dashboard_app, user: user, account: account, enabled: false) }
+
+      it 'returns only enabled dashboard apps' do
+        get "/api/v1/accounts/#{account.id}/dashboard_apps",
+            headers: user.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body.pluck('id')).to contain_exactly(enabled_dashboard_app.id)
+      end
+    end
   end
 
   describe 'GET /api/v1/accounts/{account.id}/dashboard_apps/:id' do
@@ -54,7 +69,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
   end
 
   describe 'POST /api/v1/accounts/{account.id}/dashboard_apps' do
-    let(:payload) { { dashboard_app: { title: 'CRM Dashboard', content: [{ type: 'frame', url: 'https://link.com' }] } } }
+    let(:payload) { { dashboard_app: { title: 'CRM Dashboard', enabled: true, content: [{ type: 'frame', url: 'https://link.com' }] } } }
     let(:no_ssl_payload) { { dashboard_app: { title: 'CRM Dashboard', content: [{ type: 'frame', url: 'http://link.com' }] } } }
     let(:invalid_type_payload) { { dashboard_app: { title: 'CRM Dashboard', content: [{ type: 'dda', url: 'https://link.com' }] } } }
     let(:invalid_url_payload) { { dashboard_app: { title: 'CRM Dashboard', content: [{ type: 'frame', url: 'com' }] } } }
@@ -142,13 +157,13 @@ RSpec.describe 'DashboardAppsController', type: :request do
                as: :json
         end.not_to change(DashboardApp, :count)
 
-        expect(response).to have_http_status(:unauthorized)
+        expect(response).to have_http_status(:forbidden)
       end
     end
   end
 
   describe 'PATCH /api/v1/accounts/{account.id}/dashboard_apps/:id' do
-    let(:payload) { { dashboard_app: { title: 'CRM Dashboard', content: [{ type: 'frame', url: 'https://link.com' }] } } }
+    let(:payload) { { dashboard_app: { title: 'CRM Dashboard', enabled: false, content: [{ type: 'frame', url: 'https://link.com' }] } } }
     let(:user) { create(:user, account: account, role: :administrator) }
     let!(:dashboard_app) { create(:dashboard_app, user: user, account: account) }
 
@@ -171,6 +186,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
         expect(response).to have_http_status(:success)
         json_response = response.parsed_body
         expect(dashboard_app.reload.title).to eq('CRM Dashboard')
+        expect(dashboard_app.enabled).to be(false)
         expect(json_response['content'][0]['link']).to eq payload[:dashboard_app][:content][0][:link]
         expect(json_response['content'][0]['type']).to eq payload[:dashboard_app][:content][0][:type]
       end
@@ -185,7 +201,7 @@ RSpec.describe 'DashboardAppsController', type: :request do
               params: payload,
               as: :json
 
-        expect(response).to have_http_status(:unauthorized)
+        expect(response).to have_http_status(:forbidden)
         expect(dashboard_app.reload.title).not_to eq('CRM Dashboard')
       end
     end
@@ -220,7 +236,23 @@ RSpec.describe 'DashboardAppsController', type: :request do
                headers: agent.create_new_auth_token,
                as: :json
 
-        expect(response).to have_http_status(:unauthorized)
+        expect(response).to have_http_status(:forbidden)
+        expect(DashboardApp.exists?(dashboard_app.id)).to be(true)
+      end
+    end
+
+    context 'when the dashboard app belongs to another account' do
+      let(:other_account) { create(:account) }
+      let(:other_user) { create(:user, account: other_account, role: :administrator) }
+      let!(:dashboard_app) { create(:dashboard_app, user: other_user, account: other_account) }
+      let(:user) { create(:user, account: account, role: :administrator) }
+
+      it 'does not expose the dashboard app' do
+        delete "/api/v1/accounts/#{account.id}/dashboard_apps/#{dashboard_app.id}",
+               headers: user.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:not_found)
         expect(DashboardApp.exists?(dashboard_app.id)).to be(true)
       end
     end
