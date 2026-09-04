@@ -196,6 +196,11 @@ class Contact < ApplicationRecord
     find_by(email: email&.downcase)
   end
 
+  def self.normalize_brazilian_phone_number(phone_number)
+    match = /\A\+55([1-9]\d)9(\d{8})\z/.match(phone_number)
+    match ? "+55#{match[1]}#{match[2]}" : phone_number
+  end
+
   private
 
   def ip_lookup
@@ -213,8 +218,7 @@ class Contact < ApplicationRecord
   def normalize_brazilian_phone_number
     return if phone_number.blank?
 
-    match = /\A\+55([1-9]\d)9(\d{8})\z/.match(phone_number)
-    self.phone_number = "+55#{match[1]}#{match[2]}" if match
+    self.phone_number = self.class.normalize_brazilian_phone_number(phone_number)
   end
 
   def canonical_brazilian_phone_number_is_unique
