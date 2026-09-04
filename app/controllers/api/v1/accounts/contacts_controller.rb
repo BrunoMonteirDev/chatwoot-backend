@@ -26,10 +26,11 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   def search
     render json: { error: 'Specify search string with parameter q' }, status: :unprocessable_entity if params[:q].blank? && return
 
-    contacts = Current.account.contacts.where(
-      'name ILIKE :search OR email ILIKE :search OR phone_number ILIKE :search OR contacts.identifier LIKE :search',
-      search: "%#{params[:q].strip}%"
-    )
+    query = params[:q].strip
+    normalized_phone_number = Contacts::PhoneNumberNormalizer.normalize(query)
+    conditions = 'name ILIKE :search OR email ILIKE :search OR phone_number ILIKE :search OR contacts.identifier LIKE :search'
+    conditions += ' OR phone_number = :normalized_phone_number' if normalized_phone_number.present?
+    contacts = Current.account.contacts.where(conditions, search: "%#{query}%", normalized_phone_number: normalized_phone_number)
     @contacts = fetch_contacts_with_has_more(contacts)
   end
 
@@ -87,7 +88,13 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   def create
     ActiveRecord::Base.transaction do
       @contact = Current.account.contacts.new(permitted_params.except(:avatar_url))
-      @contact.save!
+      existing_contact = find_existing_contact
+      if existing_contact
+        @contact = existing_contact
+        @existing = true
+      else
+        @contact.save!
+      end
       @contact_inbox = build_contact_inbox
       process_avatar_from_url
     end
@@ -210,6 +217,14 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
 
   def process_avatar_from_url
     ::Avatar::AvatarFromUrlJob.perform_later(@contact, params[:avatar_url]) if params[:avatar_url].present?
+  end
+
+  def find_existing_contact
+    phone_number = Contacts::PhoneNumberNormalizer.normalize(permitted_params[:phone_number])
+    return Current.account.contacts.find_by(phone_number: phone_number) if phone_number.present?
+
+    email = permitted_params[:email].to_s.downcase.presence
+    Current.account.contacts.find_by(email: email) if email
   end
 
   def render_error(error, error_status)

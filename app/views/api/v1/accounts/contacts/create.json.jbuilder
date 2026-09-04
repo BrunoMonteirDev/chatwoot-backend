@@ -1,4 +1,5 @@
 json.payload do
+  json.existing @existing || false
   json.contact do
     json.partial! 'api/v1/models/contact', formats: [:json], resource: @contact, with_contact_inboxes: true
   end

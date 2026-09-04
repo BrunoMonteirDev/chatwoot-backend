@@ -594,6 +594,40 @@ RSpec.describe 'Contacts API', type: :request do
 
         expect(response).to have_http_status(:success)
       end
+
+      it 'normalizes a phone number, reuses it in the same account, and makes it searchable' do
+        params = { name: 'Maria', phone_number: '(44) 98888-7777' }
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/contacts", headers: admin.create_new_auth_token, params: params
+        end.to change(Contact, :count).by(1)
+
+        contact = Contact.last
+        expect(contact.phone_number).to eq('+5544988887777')
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/contacts", headers: admin.create_new_auth_token,
+                                                          params: params.merge(phone_number: '5544988887777')
+        end.not_to change(Contact, :count)
+        expect(response.parsed_body.dig('payload', 'existing')).to be(true)
+        expect(response.parsed_body.dig('payload', 'contact', 'id')).to eq(contact.id)
+
+        get "/api/v1/accounts/#{account.id}/contacts/search", params: { q: '+55 44 98888-7777' }, headers: admin.create_new_auth_token
+        expect(response.parsed_body['payload'].pluck('id')).to include(contact.id)
+      end
+
+      it 'keeps matching phone numbers isolated by account and preserves international E.164 numbers' do
+        other_account = create(:account)
+        post "/api/v1/accounts/#{account.id}/contacts", headers: admin.create_new_auth_token,
+                                                        params: { name: 'International', phone_number: '+14155552671' }
+        expect(response.parsed_body.dig('payload', 'contact', 'phone_number')).to eq('+14155552671')
+
+        other_admin = create(:user, account: other_account, role: :administrator)
+        expect do
+          post "/api/v1/accounts/#{other_account.id}/contacts", headers: other_admin.create_new_auth_token,
+                                                                params: { name: 'Maria', phone_number: '5544988887777' }
+        end.to change(Contact, :count).by(1)
+      end
     end
   end
 
