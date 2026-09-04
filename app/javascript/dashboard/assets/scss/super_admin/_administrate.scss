@@ -1,0 +1,27 @@
+// Administrate's legacy stylesheet is not emitted by the current Rails asset
+// pipeline. Vite owns the Super Admin entrypoint, so include its server-rendered
+// UI rules here. `selectize` was an old asset-pipeline-only dependency and is
+// deliberately excluded; no Super Admin screen uses that widget.
+@import '../../../../../assets/stylesheets/administrate/reset/normalize';
+@import '../../../../../assets/stylesheets/administrate/utilities/variables';
+@import '../../../../../assets/stylesheets/administrate/utilities/text-color';
+@import '../../../../../assets/stylesheets/administrate/library/clearfix';
+@import '../../../../../assets/stylesheets/administrate/library/data-label';
+@import '../../../../../assets/stylesheets/administrate/library/variables';
+@import '../../../../../assets/stylesheets/administrate/base/forms';
+@import '../../../../../assets/stylesheets/administrate/base/layout';
+@import '../../../../../assets/stylesheets/administrate/base/lists';
+@import '../../../../../assets/stylesheets/administrate/base/tables';
+@import '../../../../../assets/stylesheets/administrate/base/typography';
+@import '../../../../../assets/stylesheets/administrate/components/app-container';
+@import '../../../../../assets/stylesheets/administrate/components/attributes';
+@import '../../../../../assets/stylesheets/administrate/components/buttons';
+@import '../../../../../assets/stylesheets/administrate/components/cells';
+@import '../../../../../assets/stylesheets/administrate/components/field-unit';
+@import '../../../../../assets/stylesheets/administrate/components/flashes';
+@import '../../../../../assets/stylesheets/administrate/components/form-actions';
+@import '../../../../../assets/stylesheets/administrate/components/main-content';
+@import '../../../../../assets/stylesheets/administrate/components/pagination';
+@import '../../../../../assets/stylesheets/administrate/components/search';
+@import '../../../../../assets/stylesheets/administrate/components/reports';
+@import '../../../../../assets/stylesheets/administrate/custom_styles';

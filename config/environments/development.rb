@@ -62,6 +62,11 @@ Rails.application.configure do
 
   # Disable host check during development
   config.hosts = nil
+
+  # Vite/reverse-proxy development setups commonly expose the browser on a
+  # different localhost port than Puma. Keep CSRF tokens enabled, but do not
+  # reject a valid form solely because those two local origins differ.
+  config.action_controller.forgery_protection_origin_check = false
   
   # GitHub Codespaces configuration
   if ENV['CODESPACES']

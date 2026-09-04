@@ -28,6 +28,16 @@ class SuperAdmin::ApplicationController < Administrate::ApplicationController
 
   private
 
+  # The Super Admin is a Rails form UI, while local development can expose it
+  # through Vite/a port-forward (localhost:3002) and send it to Puma
+  # (127.0.0.1:3000). Rails still validates the authenticity token; this only
+  # accepts that loopback origin mismatch in development.
+  def valid_request_origin?
+    return true if Rails.env.development? && request.origin.to_s.match?(%r{\Ahttp://(?:localhost|127\.0\.0\.1)(?::\d+)?\z})
+
+    super
+  end
+
   def render_vue_component(component_name, props = {})
     html_options = {
       id: 'app',
