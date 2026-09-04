@@ -94,7 +94,7 @@ export default {
 
 <template>
   <div
-    class="conversation-details-wrap flex flex-col min-w-0 w-full bg-n-surface-1 relative"
+    class="conversation-details-wrap flex flex-1 flex-col min-h-0 min-w-0 w-full overflow-hidden bg-n-surface-1 relative"
     :class="{
       'border-l rtl:border-l-0 rtl:border-r border-n-weak': !isOnExpandedLayout,
     }"
@@ -122,7 +122,7 @@ export default {
         is-compact
       />
     </woot-tabs>
-    <div v-show="!activeIndex" class="flex h-full min-h-0 m-0">
+    <div v-show="!activeIndex" class="flex flex-1 min-h-0 m-0 overflow-hidden">
       <MessagesView
         v-if="currentChat.id"
         :inbox-id="inboxId"

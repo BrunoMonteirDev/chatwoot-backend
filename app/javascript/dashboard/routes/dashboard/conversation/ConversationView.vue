@@ -195,7 +195,9 @@ export default {
 </script>
 
 <template>
-  <section class="flex w-full h-full min-w-0">
+  <section
+    class="flex flex-1 w-full h-full min-h-0 min-w-0 overflow-hidden overscroll-none"
+  >
     <ChatList
       :show-conversation-list="showConversationList"
       :conversation-inbox="inboxId"
