@@ -49,6 +49,8 @@ class Whatsapp::HybridWahaInboundService
       'whatsapp_provider_message_key' => @payload['provider_message_key'],
       'whatsapp_participant_jid' => @payload['participant_jid'],
       'whatsapp_participant_name' => @payload['participant_name'],
+      'whatsapp_participant_phone' => @payload['participant_phone'],
+      'whatsapp_participant_avatar_url' => @payload['participant_avatar_url'],
       'whatsapp_chat_type' => 'group', 'in_reply_to_external_id' => @payload['quoted_message_id'].presence && "waha:#{@payload['quoted_message_id']}"
     }.compact
   end

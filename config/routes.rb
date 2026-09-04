@@ -169,6 +169,7 @@ Rails.application.routes.draw do
               post :filter
             end
             scope module: :conversations do
+              resource :send_capability, only: [:show], controller: 'send_capabilities'
               resources :messages, only: [:index, :create, :destroy, :update] do
                 member do
                   post :translate

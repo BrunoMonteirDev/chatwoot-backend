@@ -1,6 +1,6 @@
 class Api::V1::Accounts::DashboardAppsController < Api::V1::Accounts::BaseController
   include PermissionAuthorization
-  before_action -> { require_system_permission!('integrations_manage') }
+  before_action -> { require_system_permission!('integrations_manage') }, only: [:create, :update, :destroy]
   before_action :check_authorization
   before_action :fetch_dashboard_apps, except: [:create]
   before_action :fetch_dashboard_app, only: [:show, :update, :destroy]
@@ -37,6 +37,7 @@ class Api::V1::Accounts::DashboardAppsController < Api::V1::Accounts::BaseContro
   def permitted_payload
     params.require(:dashboard_app).permit(
       :title,
+      :enabled,
       content: [:url, :type]
     )
   end

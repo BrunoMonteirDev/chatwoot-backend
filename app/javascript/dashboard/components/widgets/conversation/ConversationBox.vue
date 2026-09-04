@@ -39,6 +39,9 @@ export default {
       currentChat: 'getSelectedChat',
       dashboardApps: 'dashboardApps/getRecords',
     }),
+    enabledDashboardApps() {
+      return this.dashboardApps.filter(app => app.enabled !== false);
+    },
     dashboardAppTabs() {
       return [
         {
@@ -46,7 +49,7 @@ export default {
           index: 0,
           name: this.$t('CONVERSATION.DASHBOARD_APP_TAB_MESSAGES'),
         },
-        ...this.dashboardApps.map((dashboardApp, index) => ({
+        ...this.enabledDashboardApps.map((dashboardApp, index) => ({
           key: `dashboard-${dashboardApp.id}`,
           index: index + 1,
           name: dashboardApp.title,
@@ -104,11 +107,11 @@ export default {
       :chat="currentChat"
       :show-back-button="isOnExpandedLayout && !isInboxView"
       :class="{
-        'border-b border-b-n-weak !pt-2': !dashboardApps.length,
+        'border-b border-b-n-weak !pt-2': !enabledDashboardApps.length,
       }"
     />
     <woot-tabs
-      v-if="dashboardApps.length && currentChat.id"
+      v-if="enabledDashboardApps.length && currentChat.id"
       :index="activeIndex"
       class="h-10"
       @change="onDashboardAppTabChange"
@@ -135,11 +138,11 @@ export default {
       <slot />
     </div>
     <DashboardAppFrame
-      v-for="(dashboardApp, index) in dashboardApps"
+      v-for="(dashboardApp, index) in enabledDashboardApps"
       v-show="activeIndex - 1 === index"
       :key="currentChat.id + '-' + dashboardApp.id"
       :is-visible="activeIndex - 1 === index"
-      :config="dashboardApps[index].content"
+      :config="enabledDashboardApps[index].content"
       :position="index"
       :current-chat="currentChat"
     />
