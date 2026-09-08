@@ -38,6 +38,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def show; end
 
+  def send_capability
+    render json: Conversations::WhatsappSendCapabilityService.new(@conversation).perform
+  end
+
   def create
     ActiveRecord::Base.transaction do
       @conversation = ConversationBuilder.new(params: params, contact_inbox: @contact_inbox).perform

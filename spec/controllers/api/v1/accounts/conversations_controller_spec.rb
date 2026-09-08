@@ -3,6 +3,33 @@ require 'rails_helper'
 RSpec.describe 'Conversations API', type: :request do
   let(:account) { create(:account) }
 
+  describe 'GET /api/v1/accounts/:account_id/conversations/:id/send_capability' do
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false) }
+    let(:conversation) { create(:conversation, account: account, inbox: channel.inbox) }
+
+    before { create(:inbox_member, user: agent, inbox: channel.inbox) }
+
+    it 'returns native Meta capability for an authorized conversation' do
+      create(:message, account: account, inbox: channel.inbox, conversation: conversation, message_type: :incoming, created_at: 1.hour.ago)
+
+      get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/send_capability", headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to include('applicable' => true, 'can_send_freeform' => true,
+                                               'send_block_reason' => nil, 'required_transport' => 'meta_cloud')
+    end
+
+    it 'does not expose a conversation from another account' do
+      other_account = create(:account)
+      other_conversation = create(:conversation, account: other_account)
+
+      get "/api/v1/accounts/#{account.id}/conversations/#{other_conversation.display_id}/send_capability", headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
   describe 'GET /api/v1/accounts/{account.id}/conversations' do
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do
