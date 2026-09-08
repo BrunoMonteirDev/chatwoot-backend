@@ -8,10 +8,10 @@ class Whatsapp::HybridWahaInboundService
   def perform
     return Result.new(handled: false, ignored: false) unless channel
     raise ArgumentError, 'Invalid hybrid WAHA session binding' unless channel.hybrid_waha_enabled? && channel.hybrid_waha_session == @waha_session
-    return Result.new(handled: true, ignored: true) unless group?
 
     existing = Message.find_by(account_id: channel.account_id, source_id: source_id)
     return Result.new(handled: true, ignored: false, message: existing) if existing
+    return Result.new(handled: true, ignored: true) unless group?
 
     ActiveRecord::Base.transaction do
       contact_inbox = ContactInboxSourceIdResolver.new(

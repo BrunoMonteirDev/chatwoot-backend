@@ -26,6 +26,14 @@ describe Whatsapp::HybridWahaInboundService do
     expect(Message.count).to eq(0)
   end
 
+  it 'reconciles a private outgoing echo with the existing Chatwoot message' do
+    conversation = create(:conversation, account: account, inbox: inbox)
+    outgoing = create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :outgoing, source_id: 'waha:3EB0')
+
+    expect { perform(remote_jid: '5511999999999@c.us', from_me: true) }.not_to change(Message, :count)
+    expect(perform(remote_jid: '5511999999999@c.us', from_me: true).message).to eq(outgoing)
+  end
+
   it 'creates one group message in the official inbox and retains WAHA identity' do
     result = perform
     message = result.message
