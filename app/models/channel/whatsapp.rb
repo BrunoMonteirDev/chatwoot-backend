@@ -40,6 +40,9 @@ class Channel::Whatsapp < ApplicationRecord
 
   validates :provider, inclusion: { in: PROVIDERS }
   validates :phone_number, presence: true, uniqueness: true
+  validates :out_of_window_strategy, inclusion: { in: %w[template waha] }
+  validates :meta_failure_strategy, inclusion: { in: %w[block waha] }
+  validate :validate_hybrid_waha_configuration
   validate :validate_provider_config
 
   after_create :sync_templates
@@ -97,8 +100,16 @@ class Channel::Whatsapp < ApplicationRecord
       'meta_connection_last_changed_at' => meta_connection_last_changed_at,
       'meta_connection_last_error' => meta_connection_last_error,
       'meta_account_update_event' => meta_account_update_event,
-      'meta_account_update_at' => meta_account_update_at
+      'meta_account_update_at' => meta_account_update_at,
+      'hybrid_enabled' => hybrid_enabled?,
+      'hybrid_waha_session' => hybrid_waha_session,
+      'out_of_window_strategy' => out_of_window_strategy,
+      'meta_failure_strategy' => meta_failure_strategy
     }.compact
+  end
+
+  def hybrid_waha_enabled?
+    hybrid_enabled? && hybrid_waha_session.present?
   end
 
   # Enables voice: turns calling on at Meta (idempotent), then re-registers webhooks
@@ -159,6 +170,12 @@ class Channel::Whatsapp < ApplicationRecord
   end
 
   private
+
+  def validate_hybrid_waha_configuration
+    return unless hybrid_enabled?
+
+    errors.add(:provider, 'must be whatsapp_cloud for hybrid WAHA') unless provider == 'whatsapp_cloud'
+  end
 
   def ensure_webhook_verify_token
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider == 'whatsapp_cloud'

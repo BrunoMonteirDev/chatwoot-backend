@@ -10,12 +10,22 @@ class Conversations::WhatsappSendCapabilityService
     return unavailable('reauthorization_required') if channel.reauthorization_required?
     return unavailable('meta_disconnected') if channel.meta_connection_status.in?(%w[disconnected error])
     @window_open = Conversations::MessageWindowService.new(conversation).can_reply?
+    return hybrid_waha if !@window_open && channel.hybrid_waha_enabled? && channel.out_of_window_strategy == 'waha'
     return outside_window unless @window_open
 
     connected
   end
 
   private
+
+  def hybrid_waha
+    state = Whatsapp::HybridWahaBridgeClient.new(channel: channel).binding(action: :status).fetch('status')
+    return connected.merge(required_transport: 'waha') if state == 'connected'
+
+    unavailable(state == 'missing' ? 'waha_missing' : 'waha_disconnected').merge(required_transport: 'waha')
+  rescue Whatsapp::HybridWahaBridgeClient::Error
+    unavailable('waha_disconnected').merge(required_transport: 'waha')
+  end
 
   attr_reader :conversation
 

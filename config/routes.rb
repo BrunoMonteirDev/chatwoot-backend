@@ -1,4 +1,7 @@
 Rails.application.routes.draw do
+  namespace :internal do
+    post 'official_whatsapp/waha/inbound', to: 'official_whatsapp_waha#inbound'
+  end
   mount ActionCable.server => '/cable'
 
   # AUTH STARTS
@@ -300,6 +303,9 @@ Rails.application.routes.draw do
           resources :custom_filters, only: [:index, :show, :create, :update, :destroy]
           resource :branded_email_layout, only: [:show, :update]
           resources :inboxes, only: [:index, :show, :create, :update, :destroy] do
+            resource :hybrid_waha_binding, only: [:show, :create, :destroy], module: :inboxes
+            resource :hybrid_waha_configuration, only: [:show, :update], module: :inboxes
+            resources :hybrid_waha_sessions, only: [:index, :create, :show, :update, :destroy], module: :inboxes
             get :assignable_agents, on: :member
             get :campaigns, on: :member
             get :agent_bot, on: :member
