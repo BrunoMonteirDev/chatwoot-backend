@@ -1,4 +1,6 @@
 class Conversations::WhatsappSendCapabilityService
+  attr_reader :window_open
+
   def initialize(conversation)
     @conversation = conversation
   end
@@ -7,7 +9,8 @@ class Conversations::WhatsappSendCapabilityService
     return not_applicable unless native_whatsapp_inbox?
     return unavailable('reauthorization_required') if channel.reauthorization_required?
     return unavailable('meta_disconnected') if channel.meta_connection_status.in?(%w[disconnected error])
-    return outside_window unless Conversations::MessageWindowService.new(conversation).can_reply?
+    @window_open = Conversations::MessageWindowService.new(conversation).can_reply?
+    return outside_window unless @window_open
 
     connected
   end

@@ -39,7 +39,17 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def show; end
 
   def send_capability
-    render json: Conversations::WhatsappSendCapabilityService.new(@conversation).perform
+    service = Conversations::WhatsappSendCapabilityService.new(@conversation)
+    capability = service.perform
+    Rails.logger.info(
+      "[KOPLA_SEND_CAPABILITY] account_id=#{Current.account.id} conversation_id=#{@conversation.id} inbox_id=#{@conversation.inbox_id} " \
+      "channel_type=#{@conversation.inbox.channel_type} applicable=#{capability[:applicable]} can_send_message=#{capability[:can_send_message]} " \
+      "can_send_freeform=#{capability[:can_send_freeform]} requires_template=#{capability[:requires_template]} " \
+      "reason=#{capability[:send_block_reason] || 'none'} required_transport=#{capability[:required_transport] || 'none'} " \
+      "connection_state=#{capability[:connection_state]} reauthorization_required=#{@conversation.inbox.channel.reauthorization_required?} " \
+      "window=#{service.window_open.nil? ? 'unknown' : (service.window_open ? 'open' : 'closed')}"
+    )
+    render json: capability
   end
 
   def create
