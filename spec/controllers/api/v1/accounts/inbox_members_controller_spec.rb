@@ -115,6 +115,21 @@ RSpec.describe 'Inbox Member API', type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.body).to include('User must exist')
       end
+
+      it 'rejects a user from another account' do
+        other_account = create(:account)
+        other_account_agent = create(:user, account: other_account, role: :agent)
+        params = { inbox_id: inbox.id, user_ids: [other_account_agent.id] }
+
+        post "/api/v1/accounts/#{account.id}/inbox_members",
+             headers: administrator.create_new_auth_token,
+             params: params,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include('devem pertencer à conta atual')
+        expect(inbox.inbox_members).not_to exist(user_id: other_account_agent.id)
+      end
     end
   end
 

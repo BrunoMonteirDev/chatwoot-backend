@@ -21,7 +21,11 @@ module Authorization
 
     def can_view_conversation?(conversation)
       return true if administrator?
-      profile = inbox_profile(conversation.inbox)
+
+      membership = InboxMember.find_by(inbox_id: conversation.inbox_id, user_id: @user.id)
+      return false unless membership
+
+      profile = membership.permission_profile || PermissionProfile.default_inbox_for(@account)
       return true if profile.inbox_permissions.include?('conversation_view_all')
       return true if conversation.assignee_id == @user.id && profile.inbox_permissions.include?('conversation_view_assigned')
 

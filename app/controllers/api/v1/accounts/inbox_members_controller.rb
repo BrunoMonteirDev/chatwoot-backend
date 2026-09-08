@@ -1,6 +1,7 @@
 class Api::V1::Accounts::InboxMembersController < Api::V1::Accounts::BaseController
   before_action :fetch_inbox
   before_action :current_agents_ids, only: [:create, :update]
+  before_action :ensure_users_belong_to_account, only: [:create, :update, :destroy]
 
   def show
     authorize @inbox, :show?
@@ -60,5 +61,14 @@ class Api::V1::Accounts::InboxMembersController < Api::V1::Accounts::BaseControl
 
   def fetch_inbox
     @inbox = Current.account.inboxes.find(params[:inbox_id])
+  end
+
+  def ensure_users_belong_to_account
+    foreign_user_ids = User.where(id: params[:user_ids])
+                           .where.not(id: Current.account.users.select(:id))
+                           .pluck(:id)
+    return if foreign_user_ids.empty?
+
+    render json: { error: 'Os agentes devem pertencer à conta atual.' }, status: :unprocessable_entity
   end
 end

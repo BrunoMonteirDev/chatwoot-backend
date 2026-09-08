@@ -369,6 +369,30 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response).to have_http_status(:success)
         expect(JSON.parse(response.body, symbolize_names: true)[:id]).to eq(conversation.display_id)
       end
+
+      it 'applies the member permission profile when opening a conversation' do
+        profile = PermissionProfile.create!(account: account, name: 'Atribuídas', kind: :inbox,
+                                             inbox_permissions: ['conversation_view_assigned'], system_permissions: [])
+        create(:inbox_member, user: agent, inbox: conversation.inbox, permission_profile: profile)
+        conversation.update!(assignee: agent)
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'does not expose a conversation through another account URL' do
+        other_account = create(:account)
+        other_conversation = create(:conversation, account: other_account)
+
+        get "/api/v1/accounts/#{other_account.id}/conversations/#{other_conversation.display_id}",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
     end
   end
 
