@@ -28,6 +28,7 @@ class Whatsapp::IncomingMessageBaseService
     # We don't support reactions & ephemeral message now, we need to skip processing the message
     # if the webhook event is a reaction or an ephermal message or an unsupported message.
     return if unprocessable_message_type?(message_type)
+    return if reconcile_hybrid_waha_echo
 
     # Multiple webhook events can be received for the same message due to
     # misconfigurations in the Meta business manager account.
@@ -44,6 +45,14 @@ class Whatsapp::IncomingMessageBaseService
       set_conversation
       create_messages
     end
+  end
+
+  def reconcile_hybrid_waha_echo
+    return false unless outgoing_echo
+
+    Whatsapp::HybridWahaEchoReconciliationService.new(
+      inbox: inbox, meta_source_id: messages_data.first[:id]
+    ).perform.present?
   end
 
   def process_statuses
