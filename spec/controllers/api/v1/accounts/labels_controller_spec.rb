@@ -18,12 +18,25 @@ RSpec.describe 'Label API', type: :request do
       let(:agent) { create(:user, account: account, role: :administrator) }
 
       it 'returns all the labels in account' do
+        create(:label, account: create(:account), title: 'other_account')
         get "/api/v1/accounts/#{account.id}/labels",
             headers: agent.create_new_auth_token,
             as: :json
 
         expect(response).to have_http_status(:success)
         expect(response.body).to include(label.title)
+        expect(response.body).not_to include('other_account')
+      end
+    end
+
+    context 'when it is an authenticated agent' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+
+      it 'allows the account label catalog to be used by conversation selectors' do
+        get "/api/v1/accounts/#{account.id}/labels", headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['payload'].pluck('id')).to eq([label.id])
       end
     end
   end
@@ -99,6 +112,16 @@ RSpec.describe 'Label API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(label.reload.title).to eq('test_2')
+      end
+
+      it 'does not update a label from another account' do
+        other_label = create(:label, account: create(:account))
+
+        patch "/api/v1/accounts/#{account.id}/labels/#{other_label.id}", headers: admin.create_new_auth_token,
+                                                                    params: valid_params, as: :json
+
+        expect(response).to have_http_status(:not_found)
+        expect(other_label.reload.title).not_to eq('test_2')
       end
     end
   end
