@@ -43,6 +43,19 @@ describe Whatsapp::HybridWahaInboundService do
     expect(message.conversation.contact_inbox.source_id).to eq('whatsapp:group:123@g.us')
   end
 
+  it 'creates a new group message with its account-scoped participant Contact as sender' do
+    participant = create(:contact, account: account, name: 'Ana')
+    message = perform(participant_contact_id: participant.id).message
+    expect(message.sender).to eq(participant)
+    expect(message.content).to eq('olá')
+  end
+
+  it 'does not accept a participant Contact from another account' do
+    foreign = create(:contact, account: create(:account))
+    message = perform(participant_contact_id: foreign.id).message
+    expect(message.sender).to eq(message.conversation.contact)
+  end
+
   it 'deduplicates a repeated group webhook' do
     expect { perform; perform }.to change(Message, :count).by(1)
   end

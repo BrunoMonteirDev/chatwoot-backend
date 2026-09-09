@@ -20,7 +20,7 @@ class Whatsapp::HybridWahaInboundService
       conversation = contact_inbox.contact.conversations.where(inbox_id: inbox.id).where.not(status: :resolved).last ||
                      Conversation.create!(account: inbox.account, inbox: inbox, contact: contact_inbox.contact, contact_inbox: contact_inbox)
       message = conversation.messages.create!(
-        account: inbox.account, inbox: inbox, sender: @payload['from_me'] ? nil : contact_inbox.contact,
+        account: inbox.account, inbox: inbox, sender: incoming_sender(contact_inbox.contact),
         message_type: @payload['from_me'] ? :outgoing : :incoming, status: @payload['from_me'] ? :delivered : :sent,
         content: @payload['content'].to_s, source_id: source_id,
         content_attributes: transport_attributes
@@ -43,6 +43,15 @@ class Whatsapp::HybridWahaInboundService
   def group? = remote_jid.end_with?('@g.us')
   def source_id = "waha:#{@payload.fetch('external_id')}"
   def group_source_id = "whatsapp:group:#{remote_jid}"
+  def incoming_sender(group_contact)
+    return if @payload['from_me']
+
+    participant_contact || group_contact
+  end
+  def participant_contact
+    id = @payload['participant_contact_id'].presence
+    id && inbox.account.contacts.find_by(id: id)
+  end
   def transport_attributes
     {
       'whatsapp_transport' => 'waha', 'whatsapp_remote_jid' => remote_jid,
