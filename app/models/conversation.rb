@@ -64,6 +64,8 @@ class Conversation < ApplicationRecord
   include PushDataHelper
   include ConversationMuteHelpers
 
+  attr_reader :list_latest_message, :list_latest_chat_message, :list_unread_count
+
   CONVERSATION_UPDATED_ADDITIONAL_ATTRIBUTE_KEYS = %w[conversation_language].freeze
   FILTERED_UNREAD_COUNT_ADDITIONAL_ATTRIBUTE_KEYS = %w[browser_language conversation_language mail_subject referer].freeze
   FILTERED_UNREAD_COUNT_UPDATE_KEYS = %w[
@@ -196,6 +198,17 @@ class Conversation < ApplicationRecord
 
   def unread_incoming_messages
     unread_messages.where(account_id: account_id).incoming.last(10)
+  end
+
+  def preload_list_data(latest_message:, latest_chat_message:, unread_count:)
+    @list_data_preloaded = true
+    @list_latest_message = latest_message
+    @list_latest_chat_message = latest_chat_message
+    @list_unread_count = unread_count
+  end
+
+  def list_data_preloaded?
+    @list_data_preloaded == true
   end
 
   def cached_label_list_array
