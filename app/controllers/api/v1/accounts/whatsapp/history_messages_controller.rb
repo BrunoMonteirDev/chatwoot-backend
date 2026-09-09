@@ -35,7 +35,7 @@ class Api::V1::Accounts::Whatsapp::HistoryMessagesController < Api::V1::Accounts
     params.permit(
       :source_id, :transport, :direction, :timestamp, :content, :thread_id, :remote_jid,
       :quoted_message_id, :history_status, :status, :media_type,
-      :historical_media_unavailable, :chat_type, :participant_jid, :participant_name
+      :historical_media_unavailable, :chat_type, :participant_jid, :participant_name, :participant_contact_id
     )
   end
 end

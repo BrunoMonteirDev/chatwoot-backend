@@ -160,7 +160,7 @@ class Messages::MessageBuilder
   end
 
   def sender
-    message_type == 'outgoing' ? (message_sender || @user) : @conversation.contact
+    message_type == 'outgoing' ? (message_sender || @user) : (message_sender || @conversation.contact)
   end
 
   def external_created_at
@@ -180,9 +180,8 @@ class Messages::MessageBuilder
   end
 
   def message_sender
-    return if @params[:sender_type] != 'AgentBot'
-
-    AgentBot.where(account_id: [nil, @conversation.account.id]).find_by(id: @params[:sender_id])
+    return AgentBot.where(account_id: [nil, @conversation.account.id]).find_by(id: @params[:sender_id]) if @params[:sender_type] == 'AgentBot'
+    return Contact.where(account_id: @conversation.account_id).find_by(id: @params[:sender_id]) if @message_type == 'incoming' && @params[:sender_type] == 'Contact'
   end
 
   def message_params

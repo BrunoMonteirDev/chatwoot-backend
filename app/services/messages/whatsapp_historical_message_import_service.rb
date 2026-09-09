@@ -36,6 +36,7 @@ class Messages::WhatsappHistoricalMessageImportService
       lock_source_id!
       existing = account.messages.find_by(source_id: source_id)
       if existing
+        reconcile_participant_sender!(existing)
         enrich_existing_media!(existing)
         return Result.new(message: existing, created: false)
       end
@@ -60,6 +61,17 @@ class Messages::WhatsappHistoricalMessageImportService
     raise ArgumentError, 'Invalid historical message direction' unless %w[incoming outgoing].include?(direction)
     raise ArgumentError, 'Invalid historical timestamp' unless timestamp
     raise ArgumentError, 'Invalid historical media type' if payload['media_type'].present? && !MEDIA_TYPES.include?(payload['media_type'])
+    raise ArgumentError, 'Invalid participant contact' if participant_contact_id.present? && participant_contact.blank?
+  end
+
+  def participant_contact_id
+    payload['participant_contact_id'].presence
+  end
+
+  def participant_contact
+    return if participant_contact_id.blank?
+
+    @participant_contact ||= account.contacts.find_by(id: participant_contact_id)
   end
 
   def source_id
@@ -118,7 +130,7 @@ class Messages::WhatsappHistoricalMessageImportService
       private: false,
       status: Message.statuses.fetch(normalized_status),
       sender_type: direction == 'incoming' ? 'Contact' : nil,
-      sender_id: direction == 'incoming' ? conversation.contact_id : nil,
+      sender_id: direction == 'incoming' ? (participant_contact&.id || conversation.contact_id) : nil,
       source_id: source_id,
       external_source_ids: { transport == 'meta_cloud' ? 'meta' : 'waha' => source_id.delete_prefix(transport == 'meta_cloud' ? 'meta:' : 'waha:') },
       content_attributes: content_attributes,
@@ -153,6 +165,13 @@ class Messages::WhatsappHistoricalMessageImportService
     elsif media_unavailable? && message.attachments.none? && message.content.blank?
       message.update_columns(content: historical_content, processed_message_content: historical_content.truncate(150_000), updated_at: message.updated_at) # rubocop:disable Rails/SkipsModelValidations
     end
+  end
+
+  def reconcile_participant_sender!(message)
+    return unless direction == 'incoming' && participant_contact
+    return if message.sender == participant_contact
+
+    message.update_columns(sender_type: 'Contact', sender_id: participant_contact.id, updated_at: message.updated_at) # rubocop:disable Rails/SkipsModelValidations
   end
 
   def media_unavailable?

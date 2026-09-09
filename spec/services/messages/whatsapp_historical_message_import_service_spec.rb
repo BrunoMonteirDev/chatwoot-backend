@@ -51,6 +51,27 @@ describe Messages::WhatsappHistoricalMessageImportService do
     expect(account.messages.where(source_id: payload[:source_id]).count).to eq(1)
   end
 
+  it 'uses and reconciles an account-scoped participant Contact without duplicating history' do
+    participant = create(:contact, account: account, phone_number: '+5511888888888', name: 'Ana')
+    group_payload = payload.merge(source_id: 'waha:GROUP-1', transport: 'waha', thread_id: '120363@g.us',
+                                  remote_jid: '120363@g.us', chat_type: 'group', participant_jid: '5511888888888@c.us',
+                                  participant_contact_id: participant.id)
+
+    first = described_class.new(account: account, conversation: conversation, payload: group_payload.except(:participant_contact_id)).perform
+    second = described_class.new(account: account, conversation: conversation, payload: group_payload).perform
+
+    expect(second).to have_attributes(created: false, message: first.message)
+    expect(second.message.reload.sender).to eq(participant)
+    expect(account.messages.where(source_id: 'waha:GROUP-1').count).to eq(1)
+  end
+
+  it 'rejects a participant Contact from another account' do
+    foreign = create(:contact, account: create(:account))
+    expect do
+      described_class.new(account: account, conversation: conversation, payload: payload.merge(participant_contact_id: foreign.id)).perform
+    end.to raise_error(ArgumentError, 'Invalid participant contact')
+  end
+
   it 'attaches recovered historical media to an already imported message without duplicating it' do
     existing = create(:message, account: account, conversation: conversation, inbox: inbox,
                                 source_id: 'waha:3EB0MEDIA', content: nil,

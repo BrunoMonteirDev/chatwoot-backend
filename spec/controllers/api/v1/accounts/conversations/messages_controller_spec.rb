@@ -103,6 +103,22 @@ RSpec.describe 'Conversation Messages API', type: :request do
         let(:api_inbox) { create(:inbox, channel: api_channel, account: account) }
         let(:conversation) { create(:conversation, inbox: api_inbox, account: account) }
 
+        it 'uses an account-scoped participant Contact as incoming sender without changing content' do
+          participant = create(:contact, account: account, name: 'Ana')
+          params = { content: 'Mensagem original', message_type: 'incoming', sender_type: 'Contact', sender_id: participant.id }
+          post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id), params: params, headers: agent.create_new_auth_token, as: :json
+          expect(response).to have_http_status(:success)
+          expect(conversation.messages.last).to have_attributes(sender: participant, content: 'Mensagem original')
+        end
+
+        it 'does not accept a participant Contact from another account' do
+          foreign = create(:contact, account: create(:account))
+          params = { content: 'Mensagem original', message_type: 'incoming', sender_type: 'Contact', sender_id: foreign.id }
+          post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id), params: params, headers: agent.create_new_auth_token, as: :json
+          expect(response).to have_http_status(:success)
+          expect(conversation.messages.last.sender).to eq(conversation.contact)
+        end
+
         it 'reopens the conversation with new incoming message' do
           create(:message, conversation: conversation, account: account)
           conversation.resolved!
