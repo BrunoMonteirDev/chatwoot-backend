@@ -2,7 +2,6 @@ class Whatsapp::EmbeddedSignupService
   def initialize(account:, params:, inbox_id: nil)
     @account = account
     @code = params[:code]
-    @business_id = params[:business_id]
     @waba_id = params[:waba_id]
     @phone_number_id = params[:phone_number_id]
     @onboarding_mode = params[:onboarding_mode].presence
@@ -13,14 +12,18 @@ class Whatsapp::EmbeddedSignupService
     validate_parameters!
 
     access_token = exchange_code_for_token
+    log_stage("authorization exchanged waba_id=#{@waba_id}")
     phone_info = fetch_phone_info(access_token)
+    log_stage("phone resolved waba_id=#{@waba_id} phone_number_id=#{phone_info[:phone_number_id]}")
 
     channel = create_or_reauthorize_channel(access_token, phone_info)
+    log_stage("channel persisted channel_id=#{channel.id} inbox_id=#{channel.inbox.id}")
     # NOTE: We call setup_webhooks explicitly here instead of relying on after_commit callback because:
     # 1. Reauthorization flow updates an existing channel (not a create), so after_commit on: :create won't trigger
     # 2. We need to run check_channel_health_and_prompt_reauth after webhook setup completes
     # 3. The channel is marked with source: 'embedded_signup' to skip the after_commit callback
     channel.setup_webhooks
+    log_stage("webhook configured channel_id=#{channel.id}")
     Whatsapp::OperationalStateService.new(channel).update!(state: 'connected', checked_at: Time.current, error: nil)
     # Skip health check during reauthorization — phone numbers in pending provisioning state
     # (platform_type: NOT_APPLICABLE) would incorrectly trigger a disconnect email right after
@@ -34,6 +37,10 @@ class Whatsapp::EmbeddedSignupService
   end
 
   private
+
+  def log_stage(message)
+    Rails.logger.info("[WHATSAPP] Embedded signup #{message} account_id=#{@account.id}")
+  end
 
   def exchange_code_for_token
     Whatsapp::TokenExchangeService.new(@code).perform
@@ -84,7 +91,6 @@ class Whatsapp::EmbeddedSignupService
   def validate_parameters!
     missing_params = []
     missing_params << 'code' if @code.blank?
-    missing_params << 'business_id' if @business_id.blank?
     missing_params << 'waba_id' if @waba_id.blank?
 
     raise ArgumentError, "Required parameters are missing: #{missing_params.join(', ')}" unless missing_params.empty?

@@ -44,6 +44,8 @@ describe Whatsapp::EmbeddedSignupService do
 
       allow(channel).to receive(:setup_webhooks)
       allow(channel).to receive(:phone_number).and_return('+1234567890')
+      allow(channel).to receive(:id).and_return(1)
+      allow(channel).to receive(:inbox).and_return(instance_double(Inbox, id: 1))
 
       health_service = instance_double(Whatsapp::HealthService)
       allow(Whatsapp::HealthService).to receive(:new).and_return(health_service)
@@ -105,6 +107,12 @@ describe Whatsapp::EmbeddedSignupService do
     end
 
     context 'when parameters are invalid' do
+      it 'accepts parameters without business_id' do
+        service_without_business_id = described_class.new(account: account, params: params.except(:business_id))
+
+        expect { service_without_business_id.send(:validate_parameters!) }.not_to raise_error
+      end
+
       it 'raises ArgumentError for missing parameters' do
         invalid_service = described_class.new(account: account, params: { code: '', business_id: '', waba_id: '' })
         expect { invalid_service.perform }.to raise_error(ArgumentError, /Required parameters are missing/)

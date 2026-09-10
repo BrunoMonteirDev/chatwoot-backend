@@ -30,7 +30,12 @@ RSpec.describe 'WhatsApp Authorization API', type: :request do
           expect(response.parsed_body['error']).to include('code')
         end
 
-        it 'returns unprocessable entity when business_id is missing' do
+        it 'accepts the standard FINISH payload without business_id' do
+          inbox = instance_double(Inbox, id: 1, name: 'WhatsApp')
+          whatsapp_channel = instance_double(Channel::Whatsapp, id: 1, inbox: inbox, provider_config: { 'phone_number_id' => 'phone-1' })
+          embedded_signup_service = instance_double(Whatsapp::EmbeddedSignupService, perform: whatsapp_channel)
+          allow(Whatsapp::EmbeddedSignupService).to receive(:new).and_return(embedded_signup_service)
+
           post "/api/v1/accounts/#{account.id}/whatsapp/authorization",
                params: {
                  code: 'test_code',
@@ -39,8 +44,7 @@ RSpec.describe 'WhatsApp Authorization API', type: :request do
                headers: agent.create_new_auth_token,
                as: :json
 
-          expect(response).to have_http_status(:unprocessable_entity)
-          expect(response.parsed_body['error']).to include('business_id')
+          expect(response).to have_http_status(:success)
         end
 
         it 'returns unprocessable entity when waba_id is missing' do

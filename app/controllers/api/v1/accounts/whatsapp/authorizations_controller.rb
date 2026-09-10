@@ -26,7 +26,9 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
 
   def create
     validate_embedded_signup_params!
+    log_completion_received
     channel = process_embedded_signup
+    log_inbox_created(channel)
     render_success_response(channel.inbox)
   rescue CustomExceptions::Inbox::LimitExceeded => e
     render_error_response(e)
@@ -35,6 +37,17 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   end
 
   private
+
+  def log_completion_received
+    Rails.logger.info("[WHATSAPP AUTHORIZATION] completion received account_id=#{Current.account.id} " \
+                      "onboarding_mode=#{params[:onboarding_mode].presence || 'legacy'} waba_id=#{params[:waba_id]} " \
+                      "phone_number_id=#{params[:phone_number_id].presence || 'auto'}")
+  end
+
+  def log_inbox_created(channel)
+    Rails.logger.info("[WHATSAPP AUTHORIZATION] inbox created account_id=#{Current.account.id} inbox_id=#{channel.inbox.id} " \
+                      "channel_id=#{channel.id} waba_id=#{params[:waba_id]} phone_number_id=#{channel.provider_config['phone_number_id']}")
+  end
 
   def embedded_signup_config_keys
     %w[WHATSAPP_APP_ID WHATSAPP_CONFIGURATION_ID WHATSAPP_API_VERSION]
@@ -106,7 +119,6 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   def validate_embedded_signup_params!
     missing_params = []
     missing_params << 'code' if params[:code].blank?
-    missing_params << 'business_id' if params[:business_id].blank?
     missing_params << 'waba_id' if params[:waba_id].blank?
 
     return if missing_params.empty?
