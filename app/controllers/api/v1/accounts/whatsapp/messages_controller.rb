@@ -55,11 +55,12 @@ class Api::V1::Accounts::Whatsapp::MessagesController < Api::V1::Accounts::BaseC
   end
 
   def mutation_params
-    params.permit(:source_id, :content)
+    params.permit(:source_id, :content, :inbox_id)
   end
 
   def mutation_message
-    message = Current.account.messages.find_by!(source_id: mutation_params[:source_id])
+    inbox_id = mutation_params.require(:inbox_id)
+    message = Current.account.messages.find_by!(source_id: mutation_params[:source_id], inbox_id: inbox_id)
     raise ActiveRecord::RecordNotFound unless message.conversation.inbox.api?
 
     message
