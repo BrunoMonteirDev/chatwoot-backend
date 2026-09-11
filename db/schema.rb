@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_04_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_11_130000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -720,6 +720,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_04_120000) do
     t.string "meta_connection_last_error", limit: 500
     t.string "meta_account_update_event", limit: 100
     t.datetime "meta_account_update_at"
+    t.boolean "hybrid_enabled", default: false, null: false
+    t.string "hybrid_waha_session"
+    t.string "out_of_window_strategy", default: "template", null: false
+    t.string "meta_failure_strategy", default: "block", null: false
+    t.index ["hybrid_waha_session"], name: "index_channel_whatsapp_on_hybrid_waha_session", unique: true, where: "(hybrid_waha_session IS NOT NULL)"
     t.index ["phone_number"], name: "index_channel_whatsapp_on_phone_number", unique: true
     t.index ["phone_number_health_checked_at"], name: "index_channel_whatsapp_on_phone_number_health_checked_at"
   end

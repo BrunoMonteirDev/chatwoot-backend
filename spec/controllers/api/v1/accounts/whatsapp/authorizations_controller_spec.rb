@@ -17,6 +17,59 @@ RSpec.describe 'WhatsApp Authorization API', type: :request do
       let(:administrator) { create(:user, account: account, role: :administrator) }
 
       context 'when authenticated user makes request' do
+        it 'creates the WhatsApp channel and inbox through the complete authorization flow' do
+          api_client = instance_double(Whatsapp::FacebookApiClient)
+          cloud_provider = instance_double(Whatsapp::Providers::WhatsappCloudService, validate_provider_config?: true, sync_templates: nil)
+          webhook_service = instance_double(Whatsapp::WebhookSetupService, perform: true)
+          health_service = instance_double(
+            Whatsapp::HealthService,
+            fetch_health_status: { platform_type: 'CLOUD_API', throughput: { 'level' => 'STANDARD' } }
+          )
+
+          allow(Whatsapp::FacebookApiClient).to receive(:new).and_return(api_client)
+          allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_return(cloud_provider)
+          allow(api_client).to receive(:exchange_code_for_token).with('test_code').and_return('access_token' => 'test_access_token')
+          allow(api_client).to receive(:fetch_phone_numbers).with('test_waba_id').and_return(
+            'data' => [{
+              'id' => 'test_phone_id',
+              'display_phone_number' => '+55 11 95555-1234',
+              'code_verification_status' => 'VERIFIED',
+              'verified_name' => 'Test Business'
+            }]
+          )
+          allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_service)
+          allow(Whatsapp::HealthService).to receive(:new).and_return(health_service)
+
+          expect do
+            post "/api/v1/accounts/#{account.id}/whatsapp/authorization",
+                 params: {
+                   code: 'test_code',
+                   business_id: 'test_business_id',
+                   waba_id: 'test_waba_id',
+                   phone_number_id: 'test_phone_id'
+                 },
+                 headers: agent.create_new_auth_token,
+                 as: :json
+          end.to change(Channel::Whatsapp, :count).by(1).and change(Inbox, :count).by(1)
+
+          channel = Channel::Whatsapp.find_by!(phone_number: '+5511955551234')
+          expect(response).to have_http_status(:ok)
+          expect(response.parsed_body).to include('success' => true, 'id' => channel.inbox.id, 'channel_type' => 'whatsapp')
+          expect(channel).to have_attributes(
+            account: account,
+            provider: 'whatsapp_cloud',
+            out_of_window_strategy: 'template',
+            meta_failure_strategy: 'block',
+            hybrid_enabled: false
+          )
+          expect(channel.provider_config).to include(
+            'api_key' => 'test_access_token',
+            'phone_number_id' => 'test_phone_id',
+            'business_account_id' => 'test_waba_id',
+            'source' => 'embedded_signup'
+          )
+        end
+
         it 'returns unprocessable entity when code is missing' do
           post "/api/v1/accounts/#{account.id}/whatsapp/authorization",
                params: {
